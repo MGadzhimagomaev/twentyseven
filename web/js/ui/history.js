@@ -2,7 +2,7 @@
 // target, steps per week, and one group at a time. The Log lists every action,
 // newest first, and a mistaken set can be removed from it.
 import { el, ICON, compact, number, range, dayMonth, weekday, time, isoDate, addDays, plural } from '../util.js';
-import { weekTitle, isoWeekNumber } from '../week.js';
+import { weekTitle, isoWeekNumber, weekStartOf } from '../week.js';
 import { WEEKS_KEPT } from '../store.js';
 
 const DAY_NAME = { monday: 'Monday', sunday: 'Sunday' };
@@ -303,6 +303,14 @@ export function historyView(ctx) {
         anySteps ? tableView(['Week', 'Steps a day', 'Days at goal'], stepItems.map(d => [d.short, d.value == null ? '–' : number(d.value), d.note || '–'])) : null));
   }
 
+  const SETTINGS_KINDS = new Set(['weekly_goal', 'group_target', 'step_goal', 'week_start']);
+  // "Week 48 · 23–29 Nov" for Monday weeks; Sunday weeks have no number.
+  function periodOf(day) {
+    const ws = store.weekStart();
+    const start = weekStartOf(day, ws), end = addDays(start, 6);
+    return ws === 'sunday' ? range(start, end) : `Week ${isoWeekNumber(start)} · ${range(start, end)}`;
+  }
+
   function logPanel() {
     if (!logLoaded && !logLoading && !logError) queueMicrotask(() => loadLog(true));
     const days = [];
@@ -315,12 +323,15 @@ export function historyView(ctx) {
     const items = days.map(d => el('section', { class: 'log-day' },
       el('h3', { class: 'label log-date', text: dayHeading(d.day) }),
       el('ul', { class: 'log-list' }, ...d.rows.map(r => {
-        const counts = r.kind === 'set' && r.local_date !== d.day ? `counts for ${weekday(r.local_date)} ${dayMonth(r.local_date)}` : '';
+        // The week each entry counts for: sets in their week, goal and target
+        // changes from the week they took effect.
+        const period = periodOf(r.local_date);
+        const when = r.kind === 'set' ? period : SETTINGS_KINDS.has(r.kind) ? `From ${period}` : period;
         const from = r.kind === 'set' && r.source === 'ios' ? 'iPhone' : r.kind === 'set' && r.source === 'import' ? 'imported' : '';
         return el('li', { class: `log-row kind-${r.kind}` },
           el('span', { class: 'log-time', text: time(r.happened_at) }),
           el('span', { class: 'log-text' }, el('span', { text: logText(r) }),
-            counts || from ? el('span', { class: 'log-meta', text: [from, counts].filter(Boolean).join(' · ') }) : null),
+            el('span', { class: 'log-meta', text: [when, from].filter(Boolean).join(' · ') })),
           r.kind === 'set'
             ? el('button', { type: 'button', class: 'ibtn small', 'aria-label': `Remove ${logText(r)} from ${time(r.happened_at)}`, html: ICON.remove, onclick: () => removeSet(r) })
             : el('span', {}));
