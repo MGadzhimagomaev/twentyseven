@@ -85,8 +85,9 @@ function supabaseApi() {
       uid = data.user?.id ?? null;
       return toUser(data.user);
     },
+    // Signs out this device only; other phones and browsers stay signed in.
     async signOut() {
-      await sb.auth.signOut().catch(() => {});
+      await sb.auth.signOut({ scope: 'local' }).catch(() => {});
       uid = null;
     },
 
@@ -123,7 +124,7 @@ function supabaseApi() {
     },
     async deleteAccount() {
       await run(sb.rpc('delete_my_account'));
-      await sb.auth.signOut().catch(() => {});
+      await sb.auth.signOut({ scope: 'local' }).catch(() => {});
       uid = null;
     },
   };
