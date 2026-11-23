@@ -237,6 +237,11 @@ await as(A, `insert into public.set_entries (id, group_id, delta, local_date) va
 rows = await grid(A);
 ok(at(monday, 'running').sets === 1 && at(monday, 'running').target === 3, 'a training counts sessions against its own target');
 await asFails(A, `update public.muscle_groups set own_target = null where id = 'running'`, [], /sessions_have_a_target/);
+await as(A, `insert into public.set_entries (id, group_id, delta, local_date) values ($1, 'running', 1, $2)`, [await uuid(), w2]);
+await as(A, `insert into public.set_entries (id, group_id, delta, local_date) values ($1, 'legs', 1, $2)`, [await uuid(), w2]);
+rows = await grid(A);
+ok(at(w2, 'running').target === 3, 'a training keeps its own target in weeks before it was added, not the goal of sets');
+ok(at(w2, 'legs').target === 18, 'muscle groups still follow the goal that week');
 
 // ---------- account deletion ----------
 await as(A, `select public.delete_my_account()`);
