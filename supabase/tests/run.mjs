@@ -4,7 +4,7 @@
 //
 // usage: node supabase/tests/run.mjs <path to node_modules with @electric-sql/pglite>
 import { createRequire } from 'node:module';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import assert from 'node:assert/strict';
@@ -14,7 +14,9 @@ const modules = process.argv[2];
 const require = createRequire(path.join(modules, 'x.js'));
 const { PGlite } = await import(require.resolve('@electric-sql/pglite'));
 
-const migration = readFileSync(path.join(here, '..', 'migrations', '20261123000000_init.sql'), 'utf8');
+// Every migration, oldest first, as Supabase would run them.
+const dir = path.join(here, '..', 'migrations');
+const migrations = readdirSync(dir).filter(f => f.endsWith('.sql')).sort().map(f => readFileSync(path.join(dir, f), 'utf8'));
 
 // What Supabase provides before any migration runs.
 const STUB = `
@@ -31,7 +33,7 @@ const STUB = `
 // as on a project where "Grant API access to new tables automatically" is off.
 const db = new PGlite();
 await db.exec(STUB);
-await db.exec(migration);
+for (const sql of migrations) await db.exec(sql);
 
 const A = '11111111-1111-4111-8111-111111111111';
 const B = '22222222-2222-4222-8222-222222222222';
@@ -204,11 +206,27 @@ try {
   await db.exec(`reset role`);
 }
 
-// ---------- removing a mistaken set from the log ----------
-const mistaken = one(await as(A, `select id from public.set_entries where group_id = 'chest' limit 1`)).id;
-await as(A, `delete from public.set_entries where id = $1`, [mistaken]);
+// ---------- removing a mistaken set from the log, then undoing that ----------
+const mistaken = one(await as(A, `select id, group_id, delta, local_date::text as local_date, logged_at, source from public.set_entries where group_id = 'chest' limit 1`));
+await as(A, `delete from public.set_entries where id = $1`, [mistaken.id]);
 rows = await grid(A);
 ok(at(monday, 'chest').sets === 0, 'deleting a logged set removes it from the week');
+await as(A, `insert into public.set_entries (id, group_id, delta, local_date, logged_at, source) values ($1, $2, $3, $4, $5, $6)`,
+  [mistaken.id, mistaken.group_id, mistaken.delta, mistaken.local_date, mistaken.logged_at, mistaken.source]);
+rows = await grid(A);
+ok(at(monday, 'chest').sets === 1, 'undo puts the same set back under its old id');
+
+// ---------- choices made during setup are starting values, not changes ----------
+const C = '33333333-3333-4333-8333-333333333333';
+await sys(`insert into auth.users (id, email) values ($1, 'c@example.com')`, [C]);
+await as(C, `update public.settings set weekly_goal = 18, week_start = 'sunday' where user_id = $1`, [C]);
+await as(C, `update public.settings set weekly_goal = 16, onboarded_at = now() where user_id = $1`, [C]);
+const cLog = (await as(C, `select kind, local_date::text as d, new_value from public.changes order by id`)).rows;
+ok(!cLog.some(r => r.d !== '-infinity'), 'setup choices are not listed as changes');
+ok(cLog.find(r => r.kind === 'weekly_goal').new_value === '16', 'the goal picked in setup is the starting goal');
+await as(C, `update public.settings set weekly_goal = 22 where user_id = $1`, [C]);
+const cGoal = (await as(C, `select old_value, new_value from public.changes where kind = 'weekly_goal' and local_date <> '-infinity'`)).rows;
+ok(cGoal.length === 1 && cGoal[0].old_value === '16' && cGoal[0].new_value === '22', 'a goal change after setup is listed');
 
 // ---------- account deletion ----------
 await as(A, `select public.delete_my_account()`);
