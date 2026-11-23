@@ -35,7 +35,7 @@ export function setupView({ store }) {
 
   function start() {
     if (bundle === 'none' && !picked.size) {
-      message = 'Pick muscle groups or at least one training.';
+      message = 'Pick muscle groups or at least one workout.';
       draw();
       return;
     }
@@ -52,7 +52,7 @@ export function setupView({ store }) {
       ...BUNDLES.map(b => radio(`${b.name} · ${b.groups.length}`, b.key === bundle, () => { bundle = b.key; },
         el('span', { class: 'choice-note', text: b.groups.map(([, name]) => name).join(', ') }))),
       radio('No muscle groups', bundle === 'none', () => { bundle = 'none'; },
-        el('span', { class: 'choice-note', text: 'Only trainings, such as runs or gym sessions' })));
+        el('span', { class: 'choice-note', text: 'Only workouts, such as runs or gym sessions' })));
 
     const trainingRows = el('div', { class: 'picks' },
       ...TRAININGS.map(([id, name]) => {
@@ -91,8 +91,8 @@ export function setupView({ store }) {
         el('h2', { class: 'step-title', id: 'setup-groups' }, num(), 'Which muscle groups?'),
         bundles),
       el('section', { class: 'board setup-step' },
-        el('h2', { class: 'step-title', id: 'setup-trainings' }, num(), sets ? 'Trainings too?' : 'Which trainings?'),
-        el('p', { class: 'muted small', text: 'Count sessions such as runs or gym visits, each with its own weekly target. Optional; you can add your own later in Edit groups.' }),
+        el('h2', { class: 'step-title', id: 'setup-trainings' }, num(), sets ? 'Workouts too?' : 'Which workouts?'),
+        el('p', { class: 'muted small', text: 'Count workouts such as runs or gym visits, each with its own weekly target. Optional; you can add your own later in Edit groups.' }),
         trainingRows),
       el('section', { class: 'board setup-step' },
         el('h2', { class: 'step-title', id: 'setup-week' }, num(), 'Weeks start on'),

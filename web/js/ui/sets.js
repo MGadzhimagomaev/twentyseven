@@ -92,7 +92,7 @@ export function setsView(ctx) {
     if (!sum.sets && !tr.count) return null;
     const bits = [];
     if (sum.groups) bits.push(`${sum.done} of ${sum.groups} groups at goal`, plural(sum.sets, 'set', 'sets'));
-    if (tr.n) bits.push(`${tr.count} of ${tr.target} ${tr.target === 1 ? 'training' : 'trainings'}`);
+    if (tr.n) bits.push(`${tr.count} of ${tr.target} ${tr.target === 1 ? 'workout' : 'workouts'}`);
     if (sum.steps.avg != null) bits.push(`${compact(sum.steps.avg)} steps a day`);
     return el('section', { class: 'recap', 'aria-label': 'Last week' },
       el('div', { class: 'recap-body' },
@@ -112,7 +112,7 @@ export function setsView(ctx) {
           el('span', { class: 'stat-value' }, String(sum.done), el('small', { text: `/${sum.groups}` }))));
     }
     if (sum.trainings.n) {
-      items.push(el('p', { class: 'stat' }, el('span', { class: 'label', text: 'Trainings' }),
+      items.push(el('p', { class: 'stat' }, el('span', { class: 'label', text: 'Workouts' }),
         el('span', { class: 'stat-value' }, String(sum.trainings.count), el('small', { text: `/${sum.trainings.target}` }))));
     }
     if (s.settings.show_steps_on_sets) {
@@ -127,7 +127,7 @@ export function setsView(ctx) {
   function hint(isCurrent, w, sum) {
     if (!isCurrent) return el('p', { class: 'hint', text: `Past week. Anything you add here counts on ${dayMonth(w.end)}.` });
     if (!sum.sets && !sum.trainings.count) {
-      const text = sum.groups ? 'Tap a muscle group each time you finish a set.' : 'Tap a training each time you do one.';
+      const text = sum.groups ? 'Tap a muscle group each time you finish a set.' : 'Tap a workout each time you do one.';
       return el('p', { class: 'hint', text });
     }
     return null;
@@ -172,9 +172,9 @@ export function setsView(ctx) {
       stats(s, sum),
       hint(isCurrent, w, sum),
       muscleTiles.length ? el('div', { class: 'grid' }, ...muscleTiles.map(tile)) : null,
-      trainingTiles.length && muscleTiles.length ? el('h2', { class: 'section-label', text: 'Trainings' }) : null,
+      trainingTiles.length && muscleTiles.length ? el('h2', { class: 'section-label', text: 'Workouts' }) : null,
       trainingTiles.length ? el('div', { class: 'grid trainings' }, ...trainingTiles.map(tile)) : null,
-      tiles.length ? null : el('p', { class: 'hint', text: 'Nothing to count yet. Add groups or trainings in Edit groups.' }),
+      tiles.length ? null : el('p', { class: 'hint', text: 'Nothing to count yet. Add groups or workouts in Edit groups.' }),
       el('div', { class: 'tray' },
         el('button', { type: 'button', class: 'tray-btn edit', html: ICON.edit, onclick: () => openEditor(ctx) }, 'Edit groups'),
         el('button', {
@@ -199,15 +199,15 @@ export function setsView(ctx) {
     const q = sel => () => root.querySelector(sel) || document.querySelector(sel);
     const icon = name => el('span', { class: 'inline-icon', html: ICON[name] });
     const steps = [
-      { id: 'log', target: q('.grid .cell'), title: hasSets ? 'Log a set' : 'Log a training',
-        text: hasSets ? 'Tap a group each time you finish a set. Try it now.' : 'Tap a training each time you do one. Try it now.' },
+      { id: 'log', target: q('.grid .cell'), title: hasSets ? 'Log a set' : 'Log a workout',
+        text: hasSets ? 'Tap a group each time you finish a set. Try it now.' : 'Tap a workout each time you do one. Try it now.' },
       { id: 'minus', target: () => root.querySelector(`.cell[data-id="${tappedId}"] .cell-sub`) || root.querySelector('.cell-sub'), title: 'One too many?',
         text: hasSets ? '− takes one set off a group.' : '− takes one off.' },
       { id: 'undo', target: q('.tray-btn.undo'), title: 'Undo',
         text: 'Undo takes back your last action: a tap, a goal change, a group edit. Tap it again to go further back. The note at the bottom after each action has Undo too, and on a computer Ctrl+Z works.' },
       { id: 'week', target: q('.summary'), title: 'This week',
         text: [hasSets ? 'Sets so far against this week’s total target, and how many groups reached their goal.' : '',
-          hasTrainings ? (hasSets ? ' Trainings add up on their own.' : 'Trainings done so far against this week’s targets.') : '',
+          hasTrainings ? (hasSets ? ' Workouts add up on their own.' : 'Workouts done so far against this week’s targets.') : '',
           ' A tile turns green with a tick when it reaches its goal.'].join('').trim() },
     ];
     if (hasSets) {
@@ -220,16 +220,16 @@ export function setsView(ctx) {
     steps.push(
       { id: 'groups', target: q('.tray-btn.edit'), title: 'Your groups',
         text: 'Edit groups lets you rename, add, remove and reorder, or start from a ready-made set: Push / Pull / Legs, Classic, Extended or Detailed. Removed ones keep their history.' },
-      { id: 'trainings', target: hasTrainings ? () => root.querySelector('.section-label') || root.querySelector('.grid.trainings') : q('.tray-btn.edit'), title: 'Trainings',
+      { id: 'trainings', target: hasTrainings ? () => root.querySelector('.section-label') || root.querySelector('.grid.trainings') : q('.tray-btn.edit'), title: 'Workouts',
         text: hasTrainings
           ? 'Runs, rides, gym sessions: anything you count per week. Each has its own weekly target, set in Edit groups, and they never count as sets.'
-          : 'Not only muscle groups: in Edit groups you can add trainings such as runs, rides or gym sessions, each with its own weekly target. They add up apart from your sets.' },
+          : 'Not only muscle groups: in Edit groups you can add workouts such as runs, rides or gym sessions, each with its own weekly target. They add up apart from your sets.' },
       { id: 'weeks', target: q('.week-arrows'), title: 'Past weeks',
         text: `Counts start over every ${ws} at 00:00. The arrows step back through earlier weeks, where you can still add what you forgot. At the start of a week, a card sums up the last one.` },
       { id: 'saved', target: q('.sync'), title: 'Saved everywhere',
         text: 'Saved means it’s in your account and shows on all your devices. Without a connection, changes wait on this device and save once you’re back online.' },
       { id: 'history', target: q('.tab[href="#history"]'), title: 'History',
-        text: 'Each week at a glance: a grid by week (tap a name for its own chart), charts for sets, trainings and steps, and a log of every action, where you can remove a mistake.' },
+        text: 'Each week at a glance: a grid by week (tap a name for its own chart), charts for sets, workouts and steps, and a log of every action, where you can remove a mistake.' },
       { id: 'settings', target: q('.tab[href="#settings"]'), title: 'Settings',
         text: 'Week start, daily step goal, steps on this screen, export your data, delete your account, and this tour again. Sets, at the bottom left, always brings you back here.' });
     tour = createTour(steps, { onEnd: () => { tour = null; store.setShowTips(false); } });

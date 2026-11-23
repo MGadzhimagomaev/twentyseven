@@ -192,7 +192,7 @@ export function historyView(ctx) {
     if (!list.length) {
       return el('section', { class: 'board panel' }, el('p', { class: 'hint', text: 'Nothing yet. Your weeks show up here once you log something.' }));
     }
-    const unitOf = g => (g.training ? ['session', 'sessions'] : ['set', 'sets']);
+    const unitOf = g => (g.training ? ['workout', 'workouts'] : ['set', 'sets']);
     const firstTraining = list.find(g => g.training);
 
     // Groups by week.
@@ -201,7 +201,7 @@ export function historyView(ctx) {
       ...weeks.map((w, i) => el('span', { class: 'heat-x', text: (WEEKS_KEPT - 1 - i) % 3 === 0 ? label(w) : '' })));
     const heat = el('div', { class: 'heat', style: `--cols:${weeks.length}` },
       ...list.flatMap(g => [
-        g === firstTraining && list[0] !== g ? el('p', { class: 'label heat-section', text: 'Trainings' }) : null,
+        g === firstTraining && list[0] !== g ? el('p', { class: 'label heat-section', text: 'Workouts' }) : null,
         el('div', { class: 'heat-row' },
         el('button', {
           type: 'button', class: selected === g.id ? 'heat-name on' : 'heat-name', 'aria-pressed': String(selected === g.id),
@@ -260,7 +260,7 @@ export function historyView(ctx) {
     });
     const muscleList = list.filter(g => !g.training), trainingList = list.filter(g => g.training);
     const totals = totalsOf(muscleList, ['group', 'groups']);
-    const trainingTotals = totalsOf(trainingList, ['training', 'trainings']);
+    const trainingTotals = totalsOf(trainingList, ['workout', 'workouts']);
 
     // Steps, from the iPhone app.
     const stepRows = new Map((s.history.steps || []).map(r => [r.week_start, r]));
@@ -290,10 +290,10 @@ export function historyView(ctx) {
         el('p', { class: 'chart-key' }, el('span', { class: 'key-bar' }), 'Sets, all groups ', el('span', { class: 'key-bar done' }), 'At goal ', el('span', { class: 'key-line' }), 'Target'),
         tableView(['Week', 'Sets', 'Target', 'Groups at goal'], totals.map(d => [d.short, d.value ?? '–', d.target ?? '–', d.note || '–']))) : null,
       trainingList.length ? el('section', { class: 'board panel' },
-        el('h2', { class: 'panel-title', text: 'Trainings per week' }),
-        barChart({ items: trainingTotals, unit: ['session', 'sessions'], label: 'Training sessions per week against their targets' }),
-        el('p', { class: 'chart-key' }, el('span', { class: 'key-bar' }), 'Sessions, all trainings ', el('span', { class: 'key-bar done' }), 'At goal ', el('span', { class: 'key-line' }), 'Target'),
-        tableView(['Week', 'Sessions', 'Target', 'Trainings at goal'], trainingTotals.map(d => [d.short, d.value ?? '–', d.target ?? '–', d.note || '–']))) : null,
+        el('h2', { class: 'panel-title', text: 'Workouts per week' }),
+        barChart({ items: trainingTotals, unit: ['workout', 'workouts'], label: 'Workouts per week against their targets' }),
+        el('p', { class: 'chart-key' }, el('span', { class: 'key-bar' }), 'All workouts ', el('span', { class: 'key-bar done' }), 'At goal ', el('span', { class: 'key-line' }), 'Target'),
+        tableView(['Week', 'Workouts', 'Target', 'Workouts at goal'], trainingTotals.map(d => [d.short, d.value ?? '–', d.target ?? '–', d.note || '–']))) : null,
       el('section', { class: 'board panel' },
         el('h2', { class: 'panel-title', text: 'Steps per day, weekly average' }),
         anySteps

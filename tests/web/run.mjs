@@ -122,7 +122,7 @@ for (let i = 4; i < 12; i++) {
   if (seen.at(-1) === 'Weekly goal') ok((await page.locator('.tour-text').textContent()).includes('see the next tip'), 'the weekly goal step points to the per-group goal');
   if (seen.at(-1) === 'A goal for one group') howTo.push(await page.locator('.tour-text').textContent());
 }
-eq(seen.join(', '), 'Weekly goal, A goal for one group, Your groups, Trainings, Past weeks, Saved everywhere, History, Settings', 'the tour covers every part of the app');
+eq(seen.join(', '), 'Weekly goal, A goal for one group, Your groups, Workouts, Past weeks, Saved everywhere, History, Settings', 'the tour covers every part of the app');
 ok(/In Edit groups, tap .* set its number with − and \+, then Save groups/.test(howTo[0]), 'the tour explains how to give a group its own goal');
 eq(await page.locator('.tour-next').textContent(), 'Done', 'the last step ends with Done');
 await page.click('.tour-next');
@@ -210,11 +210,11 @@ await runRow.locator('[aria-label="Lower Running\'s weekly target"]').click();
 await shot('04b-editor-trainings');
 await page.click('text=Save groups');
 await page.waitForSelector('dialog.sheet', { state: 'detached' });
-eq(await page.locator('.section-label').textContent(), 'Trainings', 'trainings get their own section');
+eq(await page.locator('.section-label').textContent(), 'Workouts', 'workouts get their own section');
 eq(await target('Running'), '2', 'with their own target');
 await tile('Running').locator('.cell-add').click();
 eq(await count('Running'), 1, 'a training is logged like a set');
-ok((await page.locator('.summary').textContent()).includes('Trainings1/2'), 'trainings add up on their own');
+ok((await page.locator('.summary').textContent()).includes('Workouts1/2'), 'trainings add up on their own');
 eq(await page.locator('.summary .stat').first().textContent(), setsBefore, 'and never count as sets');
 await page.click('[aria-label="Raise the weekly goal"]');
 eq(await target('Running'), '2', 'the weekly goal doesn’t move a training');
@@ -270,8 +270,8 @@ await page.waitForSelector('.grid');
 await page.click('.tab[href="#history"]');
 await page.waitForSelector('.heat');
 eq(await page.locator('.heat-row:not(.heat-head)').count(), 9, 'one row per group and training, removed Calves included');
-eq(await page.locator('.heat-section').textContent(), 'Trainings', 'trainings are listed apart in the grid');
-ok(await page.locator('.panel-title:has-text("Trainings per week")').count() === 1, 'trainings get their own chart');
+eq(await page.locator('.heat-section').textContent(), 'Workouts', 'trainings are listed apart in the grid');
+ok(await page.locator('.panel-title:has-text("Workouts per week")').count() === 1, 'trainings get their own chart');
 ok(await page.locator('.hc[data-l="5"]').count() > 0, 'weeks at goal are ticked');
 ok(await page.locator('.plot svg').count() >= 2, 'sets and steps charts drawn');
 await page.locator('.hc[data-l="5"]').first().click();
@@ -324,7 +324,7 @@ await page.click('.tab[href="#settings"]');
 const [download] = await Promise.all([page.waitForEvent('download'), page.click('text=Sets (CSV)')]);
 const csv = readFileSync(await download.path(), 'utf8');
 ok(csv.startsWith('date,logged_at,name,type,change,source'), 'CSV export has a header');
-ok(/,Running,training,1,web/.test(csv), 'CSV export marks trainings');
+ok(/,Running,workout,1,web/.test(csv), 'CSV export marks trainings');
 ok(csv.split('\r\n').length > 40, 'CSV export has every set');
 
 // ---------- dark mode ----------
@@ -383,7 +383,7 @@ ok(!page.url().includes('error'), 'and the address is tidied');
   await p.click('text=No muscle groups');
   eq(await p.locator('#setup-goal').count(), 0, 'no weekly goal of sets without muscle groups');
   await p.click('text=Start tracking');
-  ok((await p.locator('.form-msg').textContent()).includes('at least one training'), 'setup needs something to count');
+  ok((await p.locator('.form-msg').textContent()).includes('at least one workout'), 'setup needs something to count');
   await p.click('[role="checkbox"]:has-text("Running")');
   await p.click('[role="checkbox"]:has-text("Gym")');
   await p.click('[aria-label="More gym a week"]');
@@ -393,11 +393,11 @@ ok(!page.url().includes('error'), 'and the address is tidied');
   eq(new URL(p.url()).hash, '#sets', 'setup ends on Sets even when the address said Settings');
   eq(await p.locator('.goal').count(), 0, 'no weekly goal stepper for trainings only');
   eq(await p.locator('.cell').count(), 2, 'one tile per training');
-  eq(await p.locator('.summary').textContent(), 'Trainings0/7', 'only the trainings total shows');
-  eq(`${await p.locator('.tour-count').textContent()} ${await p.locator('.tour-title').textContent()}`, '1 of 10 Log a training', 'the tour fits trainings only');
+  eq(await p.locator('.summary').textContent(), 'Workouts0/7', 'only the workouts total shows');
+  eq(`${await p.locator('.tour-count').textContent()} ${await p.locator('.tour-title').textContent()}`, '1 of 10 Log a workout', 'the tour fits trainings only');
   if (shots) await p.screenshot({ path: `${shots}/12-trainings-only.png` });
   await p.click('text=Skip tour');
-  ok((await p.locator('.hint').textContent()).includes('Tap a training'), 'the hint speaks of trainings');
+  ok((await p.locator('.hint').textContent()).includes('Tap a workout'), 'the hint speaks of trainings');
   await c.close();
 }
 

@@ -44,7 +44,7 @@ export function openEditor({ store, toast, undo }) {
   function add(name, kind, id = null) {
     name = cleanName(name);
     if (!name) return false;
-    if (draft.length >= GROUPS_MAX) { error = `Up to ${GROUPS_MAX} groups and trainings in all.`; draw(); return false; }
+    if (draft.length >= GROUPS_MAX) { error = `Up to ${GROUPS_MAX} groups and workouts in all.`; draw(); return false; }
     if (draft.some(d => lower(d.name) === name.toLowerCase())) { error = `“${name}” is already in the list.`; draw(); return false; }
     const back = [...known.values()].find(g => g.archived_at && (g.kind || 'sets') === kind && g.name.toLowerCase() === name.toLowerCase() && !draft.some(d => d.id === g.id));
     const clash = id && known.get(id) && ((known.get(id).kind || 'sets') !== kind || !known.get(id).archived_at);
@@ -59,9 +59,9 @@ export function openEditor({ store, toast, undo }) {
   }
 
   function check() {
-    if (!draft.length) return 'Keep at least one group or training.';
+    if (!draft.length) return 'Keep at least one group or workout.';
     const names = draft.map(d => cleanName(d.name));
-    if (names.some(n => !n)) return 'Every group and training needs a name.';
+    if (names.some(n => !n)) return 'Every group and workout needs a name.';
     const seen = new Set();
     for (const n of names) {
       if (seen.has(n.toLowerCase())) return `“${n}” is in the list twice.`;
@@ -119,13 +119,13 @@ export function openEditor({ store, toast, undo }) {
   function trainingRow(d, i, n) {
     return el('li', { class: 'erow runs' },
       el('div', { class: 'erow-main' },
-        nameField(d, i, 'Training'),
+        nameField(d, i, 'Workout'),
         el('div', { class: 'own-target' }, el('span', { class: 'erow-sub', text: 'Times a week' }), ...stepper(d, `${d.name}'s weekly target`))),
       ...moveButtons(d, i, n, 'sessions'));
   }
 
   function addForm(kind, placeholder) {
-    const input = el('input', { class: 'field', type: 'text', maxlength: String(NAME_MAX), placeholder, 'aria-label': kind === 'sessions' ? 'New training name' : 'New group name', spellcheck: 'false' });
+    const input = el('input', { class: 'field', type: 'text', maxlength: String(NAME_MAX), placeholder, 'aria-label': kind === 'sessions' ? 'New workout name' : 'New group name', spellcheck: 'false' });
     if (focusAdd === kind) queueMicrotask(() => { input.focus(); focusAdd = ''; });
     return el('form', {
       class: 'ed-add', autocomplete: 'off',
@@ -143,7 +143,7 @@ export function openEditor({ store, toast, undo }) {
       el('div', { class: 'ed-head' },
         el('div', { class: 'ed-head-row' },
           el('h2', { class: 'sheet-title', text: 'Edit groups' }),
-          el('span', { class: 'ed-count', text: [m.length ? plural(m.length, 'group', 'groups') : '', r.length ? plural(r.length, 'training', 'trainings') : ''].filter(Boolean).join(' · ') || 'Empty' })),
+          el('span', { class: 'ed-count', text: [m.length ? plural(m.length, 'group', 'groups') : '', r.length ? plural(r.length, 'workout', 'workouts') : ''].filter(Boolean).join(' · ') || 'Empty' })),
         el('p', { class: 'ed-note', text: 'Rename, reorder, add or remove. Removed ones keep their history.' })),
 
       el('section', { class: 'ed-section', 'aria-labelledby': 'ed-muscles' },
@@ -163,7 +163,7 @@ export function openEditor({ store, toast, undo }) {
 
       el('section', { class: 'ed-section', 'aria-labelledby': 'ed-trainings' },
         el('div', { class: 'ed-section-head' },
-          el('h3', { class: 'ed-section-title', id: 'ed-trainings', text: 'Trainings' }),
+          el('h3', { class: 'ed-section-title', id: 'ed-trainings', text: 'Workouts' }),
           el('p', { class: 'ed-note', text: 'Runs, rides, gym sessions: anything you count per week. Each has its own weekly target and adds up apart from your sets.' })),
         picks.length ? el('div', { class: 'ed-presets', role: 'group', 'aria-label': 'Quick picks' },
           el('span', { class: 'label', text: 'Add' }),
@@ -171,7 +171,7 @@ export function openEditor({ store, toast, undo }) {
             type: 'button', class: 'chip', html: ICON.plus, onclick: () => add(name, 'sessions', id),
           }, name)))) : null,
         r.length ? el('ol', { class: 'ed-list' }, ...r.map((d, i) => trainingRow(d, i, r.length))) : null,
-        addForm('sessions', 'Add a training, e.g. Climbing')),
+        addForm('sessions', 'Add a workout, e.g. Climbing')),
 
       error ? el('p', { class: 'ed-error', role: 'alert', text: error }) : null,
       el('div', { class: 'tray' },
