@@ -99,19 +99,25 @@ eq(d.changes[me].length, 0, 'setup choices are not logged as changes');
 // ---------- the tour ----------
 const tourStep = async () => `${await page.locator('.tour-count').textContent()} ${await page.locator('.tour-title').textContent()}`;
 await page.waitForSelector('.tour-card');
-eq(await tourStep(), '1 of 8 Log a set', 'the tour starts after setup');
+eq(await tourStep(), '1 of 11 Log a set', 'the tour starts after setup');
 await shot('03-tour');
 await tile('Legs').locator('.cell-add').click();
-eq(await tourStep(), '2 of 8 One too many?', 'logging a real set moves the tour on');
+eq(await tourStep(), '2 of 11 One too many?', 'logging a real set moves the tour on');
 eq(await count('Legs'), 1, 'the tour’s set is a real set');
 await page.click('.tour-next');
-eq(await tourStep(), '3 of 8 Undo', 'then Undo');
+eq(await tourStep(), '3 of 11 Undo', 'then Undo');
 await page.click('.tray-btn.undo');
 eq(await count('Legs'), 0, 'Undo works during the tour');
-eq(await tourStep(), '4 of 8 Weekly goal', 'using Undo moves the tour on');
+eq(await tourStep(), '4 of 11 This week', 'using Undo moves the tour on');
 const seen = [];
-for (let i = 4; i < 8; i++) { await page.click('.tour-next'); seen.push(await page.locator('.tour-title').textContent()); }
-eq(seen.join(', '), 'Your groups, Past weeks, History, Settings', 'the tour covers groups, past weeks, history and settings');
+const howTo = [];
+for (let i = 4; i < 11; i++) {
+  await page.click('.tour-next');
+  seen.push(await page.locator('.tour-title').textContent());
+  if (seen.at(-1) === 'A goal for one group') howTo.push(await page.locator('.tour-text').textContent());
+}
+eq(seen.join(', '), 'Weekly goal, Your groups, A goal for one group, Past weeks, Saved everywhere, History, Settings', 'the tour covers every part of the app');
+ok(/In Edit groups, tap .* set its number with − and \+, then Save groups/.test(howTo[0]), 'the tour explains how to give a group its own goal');
 eq(await page.locator('.tour-next').textContent(), 'Done', 'the last step ends with Done');
 await page.click('.tour-next');
 eq(await page.locator('.tour-card').count(), 0, 'the tour closes');
@@ -266,7 +272,7 @@ await page.click('[role="switch"]');
 await shot('07-settings');
 await page.click('text=Show the tour again');
 await page.waitForSelector('.tour-card');
-eq(await tourStep(), '1 of 8 Log a set', 'the tour can be shown again from Settings');
+eq(await tourStep(), '1 of 11 Log a set', 'the tour can be shown again from Settings');
 await page.click('text=Skip tour');
 eq(await page.locator('.tour-card').count(), 0, 'and skipped');
 await page.click('.tab[href="#settings"]');

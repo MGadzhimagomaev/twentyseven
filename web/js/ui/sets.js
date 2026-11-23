@@ -180,23 +180,30 @@ export function setsView(ctx) {
   function startTour() {
     const ws = store.weekStart() === 'sunday' ? 'Sunday' : 'Monday';
     const q = sel => () => root.querySelector(sel) || document.querySelector(sel);
+    const icon = name => el('span', { class: 'inline-icon', html: ICON[name] });
     tour = createTour([
       { id: 'log', target: q('.grid .cell'), title: 'Log a set',
         text: 'Tap a group each time you finish a set. Try it now.' },
       { id: 'minus', target: () => root.querySelector(`.cell[data-id="${tappedId}"] .cell-sub`) || root.querySelector('.cell-sub'), title: 'One too many?',
         text: '− takes one set off a group.' },
       { id: 'undo', target: q('.tray-btn.undo'), title: 'Undo',
-        text: 'Undo takes back your last action: a set, a goal change, a group edit. Tap it again to go further back.' },
+        text: 'Undo takes back your last action: a set, a goal change, a group edit. Tap it again to go further back. The note at the bottom after each action has Undo too, and on a computer Ctrl+Z works.' },
+      { id: 'week', target: q('.summary'), title: 'This week',
+        text: 'Sets so far against this week’s total target, and how many groups reached their goal. A group turns green with a tick when it gets there.' },
       { id: 'goal', target: q('.goal'), title: 'Weekly goal',
-        text: 'How many sets each group should get this week. Every group follows it, unless it has its own target.' },
-      { id: 'edit', target: q('.tray-btn.edit'), title: 'Your groups',
-        text: 'Rename, add, remove or reorder groups here. The lock gives a group its own target, so the weekly goal doesn’t change it.' },
+        text: 'How many sets each group should get this week. Every group follows it, unless you give a group its own goal.' },
+      { id: 'groups', target: q('.tray-btn.edit'), title: 'Your groups',
+        text: 'Edit groups lets you rename, add, remove and reorder groups, or start from a ready-made set: Push / Pull / Legs, Classic, Extended or Detailed. Removed groups keep their sets.' },
+      { id: 'own', target: q('.tray-btn.edit'), title: 'A goal for one group',
+        text: ['In Edit groups, tap ', icon('unlock'), ' next to a group, set its number with − and +, then Save groups. It shows ', icon('lock'), ' from then on, and the weekly goal no longer changes it. Tap the lock again to make it follow the weekly goal.'] },
       { id: 'weeks', target: q('.week-arrows'), title: 'Past weeks',
-        text: `Counts start over every ${ws} at 00:00. The arrows step back through earlier weeks, where you can still add sets you forgot.` },
+        text: `Counts start over every ${ws} at 00:00. The arrows step back through earlier weeks, where you can still add sets you forgot. At the start of a week, a card sums up the last one.` },
+      { id: 'saved', target: q('.sync'), title: 'Saved everywhere',
+        text: 'Saved means it’s in your account and shows on all your devices. Without a connection, changes wait on this device and save once you’re back online.' },
       { id: 'history', target: q('.tab[href="#history"]'), title: 'History',
-        text: 'Every week at a glance, charts for sets and steps, and a log where you can remove a set.' },
+        text: 'Each week at a glance: a grid of groups by week (tap a group for its own chart), charts for sets and steps, and a log of every action, where you can remove a set.' },
       { id: 'settings', target: q('.tab[href="#settings"]'), title: 'Settings',
-        text: 'Week start, step goal, export, and this tour again.' },
+        text: 'Week start, daily step goal, steps on this screen, export your data, delete your account, and this tour again.' },
     ], { onEnd: () => { tour = null; store.setShowTips(false); } });
   }
 

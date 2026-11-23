@@ -2,7 +2,7 @@
 // it does. The screen stays usable underneath, so the first set is logged for real.
 import { el, fill } from '../util.js';
 
-// steps: [{ id, target: () => Element | null, title, text }]
+// steps: [{ id, target: () => Element | null, title, text: string or [strings and nodes] }]
 export function createTour(steps, { onEnd } = {}) {
   let i = 0;
   let ended = false;
@@ -27,7 +27,7 @@ export function createTour(steps, { onEnd } = {}) {
     fill(card,
       el('p', { class: 'tour-count', text: `${i + 1} of ${steps.length}` }),
       el('h2', { class: 'tour-title', id: 'tour-title', text: step.title }),
-      el('p', { class: 'tour-text', text: step.text }),
+      el('p', { class: 'tour-text' }, step.text),
       el('div', { class: 'tour-actions' },
         last ? el('span') : el('button', { type: 'button', class: 'link-btn', text: 'Skip tour', onclick: end }),
         el('div', { class: 'tour-nav' },
