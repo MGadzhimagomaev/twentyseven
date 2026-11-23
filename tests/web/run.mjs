@@ -114,9 +114,10 @@ const howTo = [];
 for (let i = 4; i < 11; i++) {
   await page.click('.tour-next');
   seen.push(await page.locator('.tour-title').textContent());
+  if (seen.at(-1) === 'Weekly goal') ok((await page.locator('.tour-text').textContent()).includes('see the next tip'), 'the weekly goal step points to the per-group goal');
   if (seen.at(-1) === 'A goal for one group') howTo.push(await page.locator('.tour-text').textContent());
 }
-eq(seen.join(', '), 'Weekly goal, Your groups, A goal for one group, Past weeks, Saved everywhere, History, Settings', 'the tour covers every part of the app');
+eq(seen.join(', '), 'Weekly goal, A goal for one group, Your groups, Past weeks, Saved everywhere, History, Settings', 'the tour covers every part of the app');
 ok(/In Edit groups, tap .* set its number with − and \+, then Save groups/.test(howTo[0]), 'the tour explains how to give a group its own goal');
 eq(await page.locator('.tour-next').textContent(), 'Done', 'the last step ends with Done');
 await page.click('.tour-next');
