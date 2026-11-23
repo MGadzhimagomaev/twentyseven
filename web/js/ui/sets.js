@@ -172,7 +172,7 @@ export function setsView(ctx) {
       stats(s, sum),
       hint(isCurrent, w, sum),
       muscleTiles.length ? el('div', { class: 'grid' }, ...muscleTiles.map(tile)) : null,
-      trainingTiles.length ? el('h2', { class: 'section-label', text: 'Trainings' }) : null,
+      trainingTiles.length && muscleTiles.length ? el('h2', { class: 'section-label', text: 'Trainings' }) : null,
       trainingTiles.length ? el('div', { class: 'grid trainings' }, ...trainingTiles.map(tile)) : null,
       tiles.length ? null : el('p', { class: 'hint', text: 'Nothing to count yet. Add groups or trainings in Edit groups.' }),
       el('div', { class: 'tray' },
@@ -220,7 +220,7 @@ export function setsView(ctx) {
     steps.push(
       { id: 'groups', target: q('.tray-btn.edit'), title: 'Your groups',
         text: 'Edit groups lets you rename, add, remove and reorder, or start from a ready-made set: Push / Pull / Legs, Classic, Extended or Detailed. Removed ones keep their history.' },
-      { id: 'trainings', target: q(hasTrainings ? '.section-label' : '.tray-btn.edit'), title: 'Trainings',
+      { id: 'trainings', target: hasTrainings ? () => root.querySelector('.section-label') || root.querySelector('.grid.trainings') : q('.tray-btn.edit'), title: 'Trainings',
         text: hasTrainings
           ? 'Runs, rides, gym sessions: anything you count per week. Each has its own weekly target, set in Edit groups, and they never count as sets.'
           : 'Not only muscle groups: in Edit groups you can add trainings such as runs, rides or gym sessions, each with its own weekly target. They add up apart from your sets.' },
