@@ -144,6 +144,7 @@ export function createStore(api) {
         if (s.user?.id !== uid) return;
         merge(settings, groups, entries, steps);
         s.loadedAt = Date.now();
+        if (s.history) s.history.at = 0;      // past weeks' targets are fetched again when next needed
         s.loadError = null;
         s.phase = 'ready';
         if (s.sync !== 'saving' && s.sync !== 'error') s.sync = s.pending.length ? 'saving' : 'saved';

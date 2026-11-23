@@ -61,7 +61,7 @@ export function setsView(ctx) {
         el('div', { class: 'week-arrows', role: 'group', 'aria-label': 'Change week' },
           el('button', {
             type: 'button', class: 'ibtn', 'aria-label': 'Previous week', html: ICON.left,
-            disabled: offset <= -(WEEKS_KEPT - 1), onclick: () => { offset--; fresh = null; draw(); },
+            disabled: offset <= -(WEEKS_KEPT - 1), onclick: () => { offset--; fresh = null; draw(); store.loadHistory(); },
           }),
           el('button', {
             type: 'button', class: 'ibtn', 'aria-label': 'Next week', html: ICON.right,
