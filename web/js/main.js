@@ -51,7 +51,8 @@ function undo() {
 }
 
 const ctx = { store, toast, undo, go };
-let current = null;        // { key, view, frame }
+let current = null;        // { key, view, sub }
+let fromSignIn = false;    // the sign-in or setup screen was shown: open Sets next
 
 function shell(view, active) {
   const nav = el('nav', { class: 'tabs', 'aria-label': 'Sections' },
@@ -95,6 +96,17 @@ function render() {
   else if (!s.settings) key = s.loadError ? 'loading-error' : 'loading';
   else if (!s.settings.onboarded_at) key = 'setup';
   else key = r.name;
+
+  // Right after signing in or finishing setup, start on Sets (where the tour is),
+  // whatever page the address was left on.
+  if (key === 'auth' || key === 'setup') fromSignIn = true;
+  else if (fromSignIn && TABS.some(t => t.route === key)) {
+    fromSignIn = false;
+    if (key !== 'sets') {
+      history.replaceState(null, '', `${location.pathname}${location.search}#sets`);
+      key = 'sets';
+    }
+  }
 
   if (current?.key !== key) {
     current?.view.destroy?.();
