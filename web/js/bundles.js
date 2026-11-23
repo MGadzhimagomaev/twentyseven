@@ -34,6 +34,11 @@ export const BUNDLES = [
 
 export const bundleByKey = key => BUNDLES.find(b => b.key === key);
 
+// Trainings are counted in sessions, each toward its own weekly target.
+export const TRAININGS = [['running', 'Running'], ['cycling', 'Cycling'], ['swimming', 'Swimming'], ['gym', 'Gym'], ['yoga', 'Yoga']];
+export const TRAINING_TARGET = 3;
+export const isTraining = g => g?.kind === 'sessions';
+
 // Which bundle a list of groups matches exactly, or 'custom'.
 export function matchBundle(groups) {
   for (const b of BUNDLES) {

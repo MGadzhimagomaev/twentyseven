@@ -16,9 +16,10 @@ function csvCell(v, text = false) {
 
 export function setsCSV(data) {
   const names = new Map(data.groups.map(g => [g.id, g.name]));
-  const rows = [['date', 'logged_at', 'group', 'change', 'source'].join(',')];
+  const kinds = new Map(data.groups.map(g => [g.id, g.kind === 'sessions' ? 'training' : 'muscle group']));
+  const rows = [['date', 'logged_at', 'name', 'type', 'change', 'source'].join(',')];
   for (const e of data.sets) {
-    rows.push([csvCell(e.local_date), csvCell(e.logged_at), csvCell(names.get(e.group_id) ?? e.group_id, true), csvCell(e.delta), csvCell(e.source)].join(','));
+    rows.push([csvCell(e.local_date), csvCell(e.logged_at), csvCell(names.get(e.group_id) ?? e.group_id, true), csvCell(kinds.get(e.group_id) ?? 'muscle group'), csvCell(e.delta), csvCell(e.source)].join(','));
   }
   return rows.join('\r\n') + '\r\n';
 }
@@ -96,7 +97,7 @@ export function settingsView(ctx) {
     const s = store.state;
     if (!s.settings) return;
     const st = s.settings;
-    const groups = store.activeGroups();
+    const groups = store.muscleGroups(), trainings = store.trainings();
     const bundle = bundleByKey(st.bundle);
 
     root.replaceChildren(
@@ -104,7 +105,7 @@ export function settingsView(ctx) {
 
       el('section', { class: 'board panel', 'aria-labelledby': 'set-training' },
         el('h2', { class: 'panel-title', id: 'set-training', text: 'Training' }),
-        row('Weekly goal', 'Sets per group, each week. Groups with their own target keep it.',
+        row('Weekly goal', 'Sets per muscle group, each week. Groups with their own target keep it; trainings always have their own.',
           stepper(st.weekly_goal, { min: 1, max: 50, step: 1, label: 'weekly goal', onchange: v => change('weekly_goal', v, `Goal ${v}`) })),
         row('Weeks start on', 'Counts go back to zero at 00:00 that day.',
           el('div', { class: 'seg', role: 'radiogroup', 'aria-label': 'Weeks start on' },
@@ -112,7 +113,7 @@ export function settingsView(ctx) {
               type: 'button', role: 'radio', class: 'seg-btn', 'aria-checked': String(st.week_start === d), text: DAY_NAME[d],
               onclick: () => change('week_start', d, `Weeks start on ${DAY_NAME[d]}`),
             })))),
-        row('Muscle groups', `${bundle ? bundle.name : 'Your own'} · ${plural(groups.length, 'group', 'groups')}`,
+        row('Groups and trainings', [groups.length ? `${bundle ? bundle.name : 'Your own'} · ${plural(groups.length, 'group', 'groups')}` : 'No muscle groups', trainings.length ? plural(trainings.length, 'training', 'trainings') : ''].filter(Boolean).join(' · '),
           el('button', { type: 'button', class: 'btn', html: ICON.edit, onclick: () => openEditor(ctx) }, 'Edit groups'))),
 
       el('section', { class: 'board panel', 'aria-labelledby': 'set-steps' },

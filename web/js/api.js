@@ -95,7 +95,7 @@ function supabaseApi() {
     createSettings: () => run(sb.from('settings').upsert({ user_id: uid }, { onConflict: 'user_id', ignoreDuplicates: true })),
     saveSettings: patch => run(sb.from('settings').update(patch).eq('user_id', uid)),
 
-    loadGroups: () => run(sb.from('muscle_groups').select('id,name,position,own_target,archived_at,created_at').order('position')),
+    loadGroups: () => run(sb.from('muscle_groups').select('id,name,kind,position,own_target,archived_at,created_at').order('position')),
     // Rows always carry every column, so an upsert never trips a NOT NULL check.
     saveGroups: rows => run(sb.from('muscle_groups').upsert(rows.map(r => ({ ...r, user_id: uid })), { onConflict: 'user_id,id' })),
 

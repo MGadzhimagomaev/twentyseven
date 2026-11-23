@@ -228,6 +228,16 @@ await as(C, `update public.settings set weekly_goal = 22 where user_id = $1`, [C
 const cGoal = (await as(C, `select old_value, new_value from public.changes where kind = 'weekly_goal' and local_date <> '-infinity'`)).rows;
 ok(cGoal.length === 1 && cGoal[0].old_value === '16' && cGoal[0].new_value === '22', 'a goal change after setup is listed');
 
+// ---------- trainings: counted in sessions, always with their own target ----------
+ok(one(await as(A, `select kind from public.muscle_groups where id = 'legs'`)).kind === 'sets', 'groups are muscle groups unless said otherwise');
+await asFails(A, `insert into public.muscle_groups (id, name, position, kind) values ('running', 'Running', 9, 'sessions')`, [], /sessions_have_a_target/);
+await asFails(A, `insert into public.muscle_groups (id, name, position, kind, own_target) values ('swim', 'Swim', 9, 'laps', 2)`, [], /check constraint/);
+await as(A, `insert into public.muscle_groups (id, name, position, kind, own_target) values ('running', 'Running', 9, 'sessions', 3)`);
+await as(A, `insert into public.set_entries (id, group_id, delta, local_date) values ($1, 'running', 1, $2)`, [await uuid(), today]);
+rows = await grid(A);
+ok(at(monday, 'running').sets === 1 && at(monday, 'running').target === 3, 'a training counts sessions against its own target');
+await asFails(A, `update public.muscle_groups set own_target = null where id = 'running'`, [], /sessions_have_a_target/);
+
 // ---------- account deletion ----------
 await as(A, `select public.delete_my_account()`);
 for (const t of ['settings', 'muscle_groups', 'set_entries', 'daily_steps', 'changes']) {

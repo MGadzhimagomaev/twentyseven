@@ -79,10 +79,11 @@
       db.settings[uid] = next; save(db);
     }),
 
-    loadGroups: () => call('loadGroups', () => load().groups[me()].map(g => ({ ...g }))),
+    loadGroups: () => call('loadGroups', () => load().groups[me()].map(g => ({ kind: 'sets', ...g }))),
     saveGroups: rows => call('saveGroups', () => {
       const db = load(), uid = me(), list = db.groups[uid], set = !!db.settings[uid].onboarded_at;
       for (const r of rows) {
+        if (r.kind === 'sessions' && r.own_target == null) throw Object.assign(new Error('violates check constraint "sessions_have_a_target"'), { code: '23514' });
         const old = list.find(g => g.id === r.id);
         if (!old) {
           list.push({ ...r, created_at: new Date().toISOString() });

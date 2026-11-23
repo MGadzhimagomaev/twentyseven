@@ -99,25 +99,30 @@ eq(d.changes[me].length, 0, 'setup choices are not logged as changes');
 // ---------- the tour ----------
 const tourStep = async () => `${await page.locator('.tour-count').textContent()} ${await page.locator('.tour-title').textContent()}`;
 await page.waitForSelector('.tour-card');
-eq(await tourStep(), '1 of 11 Log a set', 'the tour starts after setup');
+eq(await tourStep(), '1 of 12 Log a set', 'the tour starts after setup');
 await shot('03-tour');
+await tile('Back').locator('.cell-add').click({ force: true });
+eq(await count('Back'), 0, 'during the tour, taps outside the lit control are ignored');
 await tile('Legs').locator('.cell-add').click();
-eq(await tourStep(), '2 of 11 One too many?', 'logging a real set moves the tour on');
+eq(await tourStep(), '2 of 12 One too many?', 'logging a real set moves the tour on');
 eq(await count('Legs'), 1, 'the tour’s set is a real set');
 await page.click('.tour-next');
-eq(await tourStep(), '3 of 11 Undo', 'then Undo');
+eq(await tourStep(), '3 of 12 Undo', 'then Undo');
 await page.click('.tray-btn.undo');
 eq(await count('Legs'), 0, 'Undo works during the tour');
-eq(await tourStep(), '4 of 11 This week', 'using Undo moves the tour on');
+eq(await tourStep(), '4 of 12 This week', 'using Undo moves the tour on');
+await page.locator('.tab[href="#history"]').click({ force: true });
+await tile('Legs').locator('.cell-add').click({ force: true });
+ok(await page.locator('.tour-card').count() === 1 && await count('Legs') === 0, 'on steps that only explain, nothing else reacts');
 const seen = [];
 const howTo = [];
-for (let i = 4; i < 11; i++) {
+for (let i = 4; i < 12; i++) {
   await page.click('.tour-next');
   seen.push(await page.locator('.tour-title').textContent());
   if (seen.at(-1) === 'Weekly goal') ok((await page.locator('.tour-text').textContent()).includes('see the next tip'), 'the weekly goal step points to the per-group goal');
   if (seen.at(-1) === 'A goal for one group') howTo.push(await page.locator('.tour-text').textContent());
 }
-eq(seen.join(', '), 'Weekly goal, A goal for one group, Your groups, Past weeks, Saved everywhere, History, Settings', 'the tour covers every part of the app');
+eq(seen.join(', '), 'Weekly goal, A goal for one group, Your groups, Trainings, Past weeks, Saved everywhere, History, Settings', 'the tour covers every part of the app');
 ok(/In Edit groups, tap .* set its number with − and \+, then Save groups/.test(howTo[0]), 'the tour explains how to give a group its own goal');
 eq(await page.locator('.tour-next').textContent(), 'Done', 'the last step ends with Done');
 await page.click('.tour-next');
@@ -173,7 +178,7 @@ eq(await page.locator('.mini-value').textContent(), '12', 'own target set in the
 await rowOf('Delts').locator('input').fill('Shoulders');
 await rowOf('Core').locator('[aria-label="Remove Core"]').click();
 await page.fill('[aria-label="New group name"]', 'Calves');
-await page.click('.add-btn');
+await page.press('[aria-label="New group name"]', 'Enter');
 await page.click('text=Save groups');
 await page.waitForSelector('dialog.sheet', { state: 'detached' });
 eq(await toastText(), 'Groups saved', 'saving groups is announced');
@@ -193,6 +198,30 @@ eq(await target('Chest'), '18', 'and unlocks Chest again');
 await saved();
 d = await db();
 ok(!d.groups[me].find(g => g.id === 'core').archived_at && d.groups[me].find(g => g.id === 'calves').archived_at, 'database matches after undo');
+
+// ---------- trainings ----------
+const setsBefore = await page.locator('.summary .stat').first().textContent();
+await page.click('text=Edit groups');
+await page.waitForSelector('dialog.sheet[open] .editor');
+await page.click('.chip:has-text("Running")');
+const runRow = page.locator('.erow.runs', { has: page.locator('input[value="Running"]') });
+eq(await runRow.locator('.mini-value').textContent(), '3', 'a training starts at 3 a week');
+await runRow.locator('[aria-label="Lower Running\'s weekly target"]').click();
+await shot('04b-editor-trainings');
+await page.click('text=Save groups');
+await page.waitForSelector('dialog.sheet', { state: 'detached' });
+eq(await page.locator('.section-label').textContent(), 'Trainings', 'trainings get their own section');
+eq(await target('Running'), '2', 'with their own target');
+await tile('Running').locator('.cell-add').click();
+eq(await count('Running'), 1, 'a training is logged like a set');
+ok((await page.locator('.summary').textContent()).includes('Trainings1/2'), 'trainings add up on their own');
+eq(await page.locator('.summary .stat').first().textContent(), setsBefore, 'and never count as sets');
+await page.click('[aria-label="Raise the weekly goal"]');
+eq(await target('Running'), '2', 'the weekly goal doesn’t move a training');
+await page.click('.tray-btn.undo');
+await saved();
+d = await db();
+ok(d.groups[me].find(g => g.id === 'running')?.kind === 'sessions', 'saved as a training');
 
 // ---------- offline ----------
 await fake(() => { window.__fake.offline = true; });
@@ -240,7 +269,9 @@ await page.waitForSelector('.grid');
 // ---------- history ----------
 await page.click('.tab[href="#history"]');
 await page.waitForSelector('.heat');
-eq(await page.locator('.heat-row:not(.heat-head)').count(), 8, 'one row per group in the grid, removed Calves included');
+eq(await page.locator('.heat-row:not(.heat-head)').count(), 9, 'one row per group and training, removed Calves included');
+eq(await page.locator('.heat-section').textContent(), 'Trainings', 'trainings are listed apart in the grid');
+ok(await page.locator('.panel-title:has-text("Trainings per week")').count() === 1, 'trainings get their own chart');
 ok(await page.locator('.hc[data-l="5"]').count() > 0, 'weeks at goal are ticked');
 ok(await page.locator('.plot svg').count() >= 2, 'sets and steps charts drawn');
 await page.locator('.hc[data-l="5"]').first().click();
@@ -273,7 +304,7 @@ await page.click('[role="switch"]');
 await shot('07-settings');
 await page.click('text=Show the tour again');
 await page.waitForSelector('.tour-card');
-eq(await tourStep(), '1 of 11 Log a set', 'the tour can be shown again from Settings');
+eq(await tourStep(), '1 of 12 Log a set', 'the tour can be shown again from Settings');
 await page.click('text=Skip tour');
 eq(await page.locator('.tour-card').count(), 0, 'and skipped');
 await page.click('.tab[href="#settings"]');
@@ -292,7 +323,8 @@ ok(/^Week \d+$/.test(await page.locator('h1').textContent()), 'settings changes 
 await page.click('.tab[href="#settings"]');
 const [download] = await Promise.all([page.waitForEvent('download'), page.click('text=Sets (CSV)')]);
 const csv = readFileSync(await download.path(), 'utf8');
-ok(csv.startsWith('date,logged_at,group,change,source'), 'CSV export has a header');
+ok(csv.startsWith('date,logged_at,name,type,change,source'), 'CSV export has a header');
+ok(/,Running,training,1,web/.test(csv), 'CSV export marks trainings');
 ok(csv.split('\r\n').length > 40, 'CSV export has every set');
 
 // ---------- dark mode ----------
@@ -304,6 +336,17 @@ await page.click('.tab[href="#history"]');
 await page.waitForSelector('.heat');
 await shot('10-history-dark');
 await page.emulateMedia({ colorScheme: 'light' });
+
+// ---------- signing in again starts on Sets ----------
+await page.click('.tab[href="#settings"]');
+await page.waitForSelector('.settings');
+await page.click('button:has-text("Sign out")');
+await page.waitForSelector('#auth-email');
+await page.fill('#auth-email', 'marat@example.com');
+await page.click('text=Send sign-in email');
+await page.fill('#auth-code', await fake(() => window.__fake.code));
+await page.waitForSelector('.grid');
+eq(new URL(page.url()).hash, '#sets', 'after signing in the app opens on Sets, not where it was left');
 
 // ---------- delete account ----------
 await page.click('.tab[href="#settings"]');
@@ -320,6 +363,36 @@ await page.goto(url + '#error=access_denied&error_code=otp_expired&error_descrip
 await page.waitForSelector('.form-msg');
 ok((await page.locator('.form-msg').textContent()).includes('expired'), 'an expired link is explained');
 ok(!page.url().includes('error'), 'and the address is tidied');
+
+// ---------- trainings only ----------
+{
+  const c = await browser.newContext({ viewport: { width: 393, height: 852 }, locale: 'de-DE', timezoneId: 'Europe/Berlin' });
+  await c.addInitScript(fakeSrc);
+  const p = await c.newPage();
+  p.on('pageerror', e => errors.push(e.message));
+  await p.goto(url + '#settings');
+  await p.evaluate(() => window.__fake.signIn('runner@example.com'));
+  await p.waitForSelector('.setup');
+  await p.click('text=No muscle groups');
+  eq(await p.locator('#setup-goal').count(), 0, 'no weekly goal of sets without muscle groups');
+  await p.click('text=Start tracking');
+  ok((await p.locator('.form-msg').textContent()).includes('at least one training'), 'setup needs something to count');
+  await p.click('[role="checkbox"]:has-text("Running")');
+  await p.click('[role="checkbox"]:has-text("Gym")');
+  await p.click('[aria-label="More gym a week"]');
+  if (shots) await p.screenshot({ path: `${shots}/11-setup-trainings.png`, fullPage: true });
+  await p.click('text=Start tracking');
+  await p.waitForSelector('.grid');
+  eq(new URL(p.url()).hash, '#sets', 'setup ends on Sets even when the address said Settings');
+  eq(await p.locator('.goal').count(), 0, 'no weekly goal stepper for trainings only');
+  eq(await p.locator('.cell').count(), 2, 'one tile per training');
+  eq(await p.locator('.summary').textContent(), 'Trainings0/7', 'only the trainings total shows');
+  eq(`${await p.locator('.tour-count').textContent()} ${await p.locator('.tour-title').textContent()}`, '1 of 10 Log a training', 'the tour fits trainings only');
+  if (shots) await p.screenshot({ path: `${shots}/12-trainings-only.png` });
+  await p.click('text=Skip tour');
+  ok((await p.locator('.hint').textContent()).includes('Tap a training'), 'the hint speaks of trainings');
+  await c.close();
+}
 
 // ---------- the week-start default ----------
 for (const [locale, timezoneId, want] of [['en-US', 'Europe/Berlin', 'monday'], ['en-US', 'America/New_York', 'sunday'], ['de-DE', 'Europe/Berlin', 'monday'], ['en-GB', 'Europe/London', 'monday']]) {

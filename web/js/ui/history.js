@@ -54,7 +54,9 @@ function barChart({ items, refLine, refLabel, unit, fmt = number, label }) {
       const cx = padL + slot * i + slot / 2, x = cx - bw / 2;
       if (d.value > 0) {
         const h = Math.max(1, (d.value / top) * ih), y0 = padT + ih, yt = y0 - h, r = Math.min(4, h, bw / 2);
-        svg += `<path class="bar" data-i="${i}" d="M${x} ${y0}V${yt + r}Q${x} ${yt} ${x + r} ${yt}H${x + bw - r}Q${x + bw} ${yt} ${x + bw} ${yt + r}V${y0}Z"/>`;
+        const goal = d.target ?? refLine;
+        const done = goal != null && goal > 0 && d.value >= goal;
+        svg += `<path class="bar${done ? ' done' : ''}" data-i="${i}" d="M${x} ${y0}V${yt + r}Q${x} ${yt} ${x + r} ${yt}H${x + bw - r}Q${x + bw} ${yt} ${x + bw} ${yt + r}V${y0}Z"/>`;
       }
       if (d.target != null && d.target > 0) {
         svg += `<line class="target" data-i="${i}" x1="${x - 3}" x2="${x + bw + 3}" y1="${y(d.target)}" y2="${y(d.target)}"/>`;
@@ -178,23 +180,29 @@ export function historyView(ctx) {
     const weeks = axisWeeks();
     const ws = store.weekStart();
     const titleOf = w => weekTitle({ start: w, end: addDays(w, 6), weekStart: ws, number: isoWeekNumber(w) });
+    const kinds = new Map(s.groups.map(g => [g.id, g.kind || 'sets']));
     const groups = new Map();
     for (const r of rows) {
       let g = groups.get(r.group_id);
-      if (!g) groups.set(r.group_id, (g = { id: r.group_id, name: r.group_name, position: r.position, archived: r.archived, cells: new Map() }));
+      if (!g) groups.set(r.group_id, (g = { id: r.group_id, name: r.group_name, position: r.position, archived: r.archived, training: kinds.get(r.group_id) === 'sessions', cells: new Map() }));
       g.cells.set(r.week_start, r);
     }
-    const list = [...groups.values()].sort((a, b) => (a.archived - b.archived) || (a.position - b.position));
+    // Muscle groups first, then trainings; removed ones at the end of each.
+    const list = [...groups.values()].sort((a, b) => (a.training - b.training) || (a.archived - b.archived) || (a.position - b.position));
     if (!list.length) {
-      return el('section', { class: 'board panel' }, el('p', { class: 'hint', text: 'Nothing yet. Your weeks show up here once you log sets.' }));
+      return el('section', { class: 'board panel' }, el('p', { class: 'hint', text: 'Nothing yet. Your weeks show up here once you log something.' }));
     }
+    const unitOf = g => (g.training ? ['session', 'sessions'] : ['set', 'sets']);
+    const firstTraining = list.find(g => g.training);
 
     // Groups by week.
     const label = w => `${dayMonth(w)}`;
     const head = el('div', { class: 'heat-row heat-head', 'aria-hidden': 'true' }, el('span', {}),
       ...weeks.map((w, i) => el('span', { class: 'heat-x', text: (WEEKS_KEPT - 1 - i) % 3 === 0 ? label(w) : '' })));
     const heat = el('div', { class: 'heat', style: `--cols:${weeks.length}` },
-      ...list.map(g => el('div', { class: 'heat-row' },
+      ...list.flatMap(g => [
+        g === firstTraining && list[0] !== g ? el('p', { class: 'label heat-section', text: 'Trainings' }) : null,
+        el('div', { class: 'heat-row' },
         el('button', {
           type: 'button', class: selected === g.id ? 'heat-name on' : 'heat-name', 'aria-pressed': String(selected === g.id),
           title: g.archived ? `${g.name} (removed)` : `${g.name}, week by week`, onclick: () => { selected = selected === g.id ? null : g.id; draw(); },
@@ -204,19 +212,19 @@ export function historyView(ctx) {
           const c = g.cells.get(w);
           if (!c) return el('span', { class: 'hc none', 'aria-hidden': 'true' });
           const lv = levelOf(c.sets, c.target);
-          const text = `${g.name}, ${range(w, addDays(w, 6))}: ${c.sets} of ${c.target} sets`;
+          const text = `${g.name}, ${range(w, addDays(w, 6))}: ${c.sets} of ${c.target} ${unitOf(g)[1]}`;
           const show = () => { cellNote = text; const n = root.querySelector('.heat-note'); if (n) n.textContent = text; };
           return el('button', {
             type: 'button', class: 'hc', 'data-l': String(lv), 'aria-label': text,
             html: lv === 5 ? ICON.tick : '', onclick: show, onpointerenter: show, onfocus: show,
           });
-        }))),
+        }))]),
       head);
     const legend = el('div', { class: 'heat-legend', 'aria-hidden': 'true' },
       el('span', { text: 'Share of target' }),
       ...[1, 2, 3, 4].map(l => el('span', { class: 'hc', 'data-l': String(l) })),
       el('span', { class: 'hc', 'data-l': '5', html: ICON.tick }), el('span', { text: 'at goal' }));
-    const heatTable = tableView(['Group', ...weeks.map(label)],
+    const heatTable = tableView(['Name', ...weeks.map(label)],
       list.map(g => [g.name + (g.archived ? ' (removed)' : ''), ...weeks.map(w => { const c = g.cells.get(w); return c ? `${c.sets}/${c.target}` : '–'; })]));
 
     // One group, week by week.
@@ -227,26 +235,32 @@ export function historyView(ctx) {
         const c = sel.cells.get(w);
         return { title: titleOf(w), short: label(w), value: c ? c.sets : null, target: c ? c.target : null };
       });
+      const [, many] = unitOf(sel);
+      const Many = many[0].toUpperCase() + many.slice(1);
       groupPanel = el('section', { class: 'board panel' },
         el('div', { class: 'panel-head' },
           el('h2', { class: 'panel-title', text: `${sel.name}, week by week` }),
           el('button', { type: 'button', class: 'ibtn', 'aria-label': 'Close', html: ICON.close, onclick: () => { selected = null; draw(); } })),
-        barChart({ items, unit: ['set', 'sets'], label: `${sel.name}: sets per week against its target` }),
-        el('p', { class: 'chart-key' }, el('span', { class: 'key-bar' }), 'Sets ', el('span', { class: 'key-line' }), 'Target'),
-        tableView(['Week', 'Sets', 'Target'], items.map(d => [d.short, d.value ?? '–', d.target ?? '–'])));
+        barChart({ items, unit: unitOf(sel), label: `${sel.name}: ${many} per week against its target` }),
+        el('p', { class: 'chart-key' }, el('span', { class: 'key-bar' }), `${Many} `, el('span', { class: 'key-bar done' }), 'At goal ', el('span', { class: 'key-line' }), 'Target'),
+        tableView(['Week', Many, 'Target'], items.map(d => [d.short, d.value ?? '–', d.target ?? '–'])));
     }
 
-    // All groups together.
-    const totals = weeks.map(w => {
+    // All muscle groups together, and all trainings together: never mixed.
+    const totalsOf = (members, what) => weeks.map(w => {
       let sets = 0, target = 0, done = 0, n = 0;
-      for (const g of list) {
+      for (const g of members) {
         const c = g.cells.get(w);
         if (!c) continue;
         sets += c.sets; target += c.target; n++;
         if (c.sets >= c.target) done++;
       }
-      return { title: titleOf(w), short: label(w), value: n ? sets : null, target: n ? target : null, note: n ? `${done} of ${n} groups at goal` : '' };
+      const [one, many] = what;
+      return { title: titleOf(w), short: label(w), value: n ? sets : null, target: n ? target : null, note: n ? `${done} of ${n} ${n === 1 ? one : many} at goal` : '' };
     });
+    const muscleList = list.filter(g => !g.training), trainingList = list.filter(g => g.training);
+    const totals = totalsOf(muscleList, ['group', 'groups']);
+    const trainingTotals = totalsOf(trainingList, ['training', 'trainings']);
 
     // Steps, from the iPhone app.
     const stepRows = new Map((s.history.steps || []).map(r => [r.week_start, r]));
@@ -263,23 +277,29 @@ export function historyView(ctx) {
 
     return el('div', { class: 'stack' },
       el('section', { class: 'board panel' },
-        el('h2', { class: 'panel-title', text: 'Groups by week' }),
-        el('p', { class: 'panel-note', text: 'Each square is one week. Darker means closer to the target. Tap a group for its own chart.' }),
+        el('h2', { class: 'panel-title', text: 'Week by week' }),
+        el('p', { class: 'panel-note', text: 'Each square is one week. Darker means closer to the target. Tap a name for its own chart.' }),
         heat,
         el('p', { class: 'readout heat-note', 'aria-live': 'polite', text: cellNote || 'Tap a square to see its count.' }),
         legend,
         heatTable),
       groupPanel,
-      el('section', { class: 'board panel' },
+      muscleList.length ? el('section', { class: 'board panel' },
         el('h2', { class: 'panel-title', text: 'Sets per week' }),
         barChart({ items: totals, unit: ['set', 'sets'], label: 'Total sets per week against the total target' }),
-        el('p', { class: 'chart-key' }, el('span', { class: 'key-bar' }), 'Sets, all groups ', el('span', { class: 'key-line' }), 'Target'),
-        tableView(['Week', 'Sets', 'Target', 'Groups at goal'], totals.map(d => [d.short, d.value ?? '–', d.target ?? '–', d.note || '–']))),
+        el('p', { class: 'chart-key' }, el('span', { class: 'key-bar' }), 'Sets, all groups ', el('span', { class: 'key-bar done' }), 'At goal ', el('span', { class: 'key-line' }), 'Target'),
+        tableView(['Week', 'Sets', 'Target', 'Groups at goal'], totals.map(d => [d.short, d.value ?? '–', d.target ?? '–', d.note || '–']))) : null,
+      trainingList.length ? el('section', { class: 'board panel' },
+        el('h2', { class: 'panel-title', text: 'Trainings per week' }),
+        barChart({ items: trainingTotals, unit: ['session', 'sessions'], label: 'Training sessions per week against their targets' }),
+        el('p', { class: 'chart-key' }, el('span', { class: 'key-bar' }), 'Sessions, all trainings ', el('span', { class: 'key-bar done' }), 'At goal ', el('span', { class: 'key-line' }), 'Target'),
+        tableView(['Week', 'Sessions', 'Target', 'Trainings at goal'], trainingTotals.map(d => [d.short, d.value ?? '–', d.target ?? '–', d.note || '–']))) : null,
       el('section', { class: 'board panel' },
         el('h2', { class: 'panel-title', text: 'Steps per day, weekly average' }),
         anySteps
           ? barChart({ items: stepItems, unit: ['step a day', 'steps a day'], refLine: stepGoal, refLabel: `Goal ${compact(stepGoal)}`, label: 'Average steps per day for each week' })
           : el('p', { class: 'panel-note', text: 'Steps come from the iPhone app. They show here once it has synced.' }),
+        anySteps ? el('p', { class: 'chart-key' }, el('span', { class: 'key-bar' }), 'Steps a day ', el('span', { class: 'key-bar done' }), 'At goal') : null,
         anySteps ? tableView(['Week', 'Steps a day', 'Days at goal'], stepItems.map(d => [d.short, d.value == null ? '–' : number(d.value), d.note || '–'])) : null));
   }
 

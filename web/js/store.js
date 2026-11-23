@@ -3,7 +3,7 @@
 // made offline wait on this device and go out when the connection is back.
 import { uuid, isoDate, addDays, timeZone } from './util.js';
 import { weekOf } from './week.js';
-import { bundleByKey, matchBundle, idFor, cleanName } from './bundles.js';
+import { bundleByKey, matchBundle, idFor, cleanName, isTraining, TRAINING_TARGET } from './bundles.js';
 import { classify } from './api.js';
 
 const CACHE = 'twentyseven.v2.';
@@ -14,8 +14,9 @@ const RETRY_MS = [2000, 5000, 15000, 30000, 60000];
 const REFRESH_AFTER_MS = 60000;
 
 const clamp = (n, lo, hi) => Math.min(hi, Math.max(lo, n));
-const groupRow = g => ({ id: g.id, name: g.name, position: g.position, own_target: g.own_target ?? null, archived_at: g.archived_at ?? null });
-const sameRow = (a, b) => a.name === b.name && a.position === b.position && (a.own_target ?? null) === (b.own_target ?? null) && !!a.archived_at === !!b.archived_at;
+const groupRow = g => ({ id: g.id, name: g.name, kind: g.kind || 'sets', position: g.position, own_target: g.own_target ?? null, archived_at: g.archived_at ?? null });
+const sameRow = (a, b) => a.name === b.name && (a.kind || 'sets') === (b.kind || 'sets') && a.position === b.position
+  && (a.own_target ?? null) === (b.own_target ?? null) && !!a.archived_at === !!b.archived_at;
 
 function blank() {
   return {
@@ -328,6 +329,10 @@ export function createStore(api) {
     else s.pending.push({ kind: 'add', row });
   }
 
+  // History is fetched from the database; after a change it is fetched again the
+  // next time it opens, so a set added to a past week shows right away.
+  const stale = () => { if (s.history) s.history.at = 0; };
+
   // ---------- undo ----------
   function pushUndo(item) {
     const last = s.undo.at(-1);
@@ -343,6 +348,7 @@ export function createStore(api) {
   function undo() {
     const item = s.undo.pop();
     if (!item) return null;
+    stale();
     if (item.type === 'entry') dropEntry(item.row.id);
     else if (item.type === 'removed') putEntry(item.row);
     else if (item.type === 'settings') queueSettings(item.before);
@@ -358,6 +364,8 @@ export function createStore(api) {
   const weekStart = () => s.settings?.week_start || 'monday';
   const goal = () => s.settings?.weekly_goal ?? 20;
   const activeGroups = () => s.groups.filter(g => !g.archived_at).sort((a, b) => a.position - b.position);
+  const muscleGroups = () => activeGroups().filter(g => !isTraining(g));
+  const trainings = () => activeGroups().filter(isTraining);
   const targetOf = g => g.own_target ?? goal();
   const currentWeek = () => weekOf(new Date(), weekStart());
 
@@ -380,7 +388,8 @@ export function createStore(api) {
     return activeGroups().map(g => {
       const count = Math.max(0, counts.get(g.id) || 0);
       const target = then?.get(g.id) ?? targetOf(g);
-      return { group: g, count, target, own: isCurrent && g.own_target != null, done: count >= target };
+      const training = isTraining(g);
+      return { group: g, training, count, target, own: isCurrent && !training && g.own_target != null, done: count >= target };
     });
   }
 
@@ -391,13 +400,17 @@ export function createStore(api) {
     return { avg, days: days.length, goal: s.settings?.step_goal ?? 10000, any: s.steps.length > 0 };
   }
 
+  // Sets and trainings add up separately, so a run never counts as a set.
   function summary(week) {
     const t = tiles(week);
+    const sets = t.filter(x => !x.training), runs = t.filter(x => x.training);
+    const add = (list, k) => list.reduce((n, x) => n + x[k], 0);
     return {
-      sets: t.reduce((n, x) => n + x.count, 0),
-      target: t.reduce((n, x) => n + x.target, 0),
-      done: t.filter(x => x.done).length,
-      groups: t.length,
+      sets: add(sets, 'count'),
+      target: add(sets, 'target'),
+      done: sets.filter(x => x.done).length,
+      groups: sets.length,
+      trainings: { count: add(runs, 'count'), target: add(runs, 'target'), done: runs.filter(x => x.done).length, n: runs.length },
       steps: stepsIn(week),
     };
   }
@@ -429,6 +442,7 @@ export function createStore(api) {
     };
     s.entries.push(row);
     s.pending.push({ kind: 'add', row });
+    stale();
     pushUndo({ type: 'entry', row, label: `${group.name} ${delta > 0 ? '+1' : '−1'}`, at: Date.now() });
     persist(); scheduleFlush(); emit();
     return row;
@@ -438,6 +452,7 @@ export function createStore(api) {
   function setSetting(field, value, label) {
     if (!s.settings || s.settings[field] === value) return;
     const before = { [field]: s.settings[field] };
+    stale();
     queueSettings({ [field]: value });
     pushUndo({ type: 'settings', field, before, after: { [field]: value }, label, at: Date.now() });
     persist(); emit();
@@ -455,13 +470,16 @@ export function createStore(api) {
     const rows = [];
     draft.forEach((d, i) => {
       const name = cleanName(d.name);
+      const kind = d.kind === 'sessions' ? 'sessions' : 'sets';
       let id = d.id;
       if (!id || used.has(id)) {
-        const own = idFor(name, new Set());
-        id = byId.get(own)?.archived_at && !used.has(own) ? own : idFor(name, taken);
+        // A removed group of the same kind and name comes back with its history.
+        const own = idFor(name, new Set()), old = byId.get(own);
+        id = old?.archived_at && (old.kind || 'sets') === kind && !used.has(own) ? own : idFor(name, taken);
       }
       taken.add(id); used.add(id);
-      rows.push({ id, name, position: i, own_target: d.own_target ?? null, archived_at: null });
+      const target = kind === 'sessions' ? (d.own_target ?? TRAINING_TARGET) : (d.own_target ?? null);
+      rows.push({ id, name, kind, position: i, own_target: target, archived_at: null });
     });
     for (const g of s.groups) {
       if (!used.has(g.id) && !g.archived_at) rows.push({ ...groupRow(g), archived_at: now });
@@ -476,8 +494,9 @@ export function createStore(api) {
     if (!changed.length) return false;
     const before = changed.map(r => (byId.has(r.id) ? groupRow(byId.get(r.id)) : { ...r, archived_at: now }));
     const bundleBefore = s.settings.bundle;
+    stale();
     queueGroups(changed);
-    const bundle = matchBundle(activeGroups());
+    const bundle = matchBundle(muscleGroups());
     if (bundle !== bundleBefore) queueSettings({ bundle });
     pushUndo({ type: 'groups', before, bundleBefore, label, at: Date.now() });
     persist(); emit();
@@ -486,11 +505,16 @@ export function createStore(api) {
 
   // First launch: groups first, so they don't show up as "added", then the settings
   // that mark setup as finished.
-  function completeSetup({ bundle, weekStart: ws, goal: g }) {
+  // `bundle` may be 'none' for someone who only counts trainings.
+  function completeSetup({ bundle, weekStart: ws, goal: g, trainings: picked = [] }) {
     const b = bundleByKey(bundle);
-    const changed = groupRowsFor(b.groups.map(([id, name]) => ({ id, name, own_target: null })));
+    const draft = [
+      ...(b ? b.groups.map(([id, name]) => ({ id, name, kind: 'sets', own_target: null })) : []),
+      ...picked.map(t => ({ id: t.id, name: t.name, kind: 'sessions', own_target: t.own_target })),
+    ];
+    const changed = groupRowsFor(draft);
     if (changed.length) queueGroups(changed);
-    queueSettings({ bundle, week_start: ws, weekly_goal: clamp(g, 1, 50), time_zone: timeZone(), onboarded_at: new Date().toISOString() });
+    queueSettings({ bundle: b ? bundle : 'custom', week_start: ws, weekly_goal: clamp(g, 1, 50), time_zone: timeZone(), onboarded_at: new Date().toISOString() });
     s.showTips = true;
     persist(); emit();
     flush();
@@ -502,6 +526,7 @@ export function createStore(api) {
     const delta = Number(r.new_value);
     const row = { id: r.ref, group_id: r.group_id, delta, local_date: r.local_date, logged_at: r.happened_at, source: r.source || 'web' };
     dropEntry(row.id);
+    stale();
     pushUndo({ type: 'removed', row, label: `${group?.name ?? 'Set'} ${delta > 0 ? '+' : '−'}${Math.abs(delta)} removed`, at: Date.now() });
     persist(); scheduleFlush(); emit();
     return row;
@@ -523,7 +548,7 @@ export function createStore(api) {
     onNotice(fn) { noticeListeners.add(fn); return () => noticeListeners.delete(fn); },
     init, sendCode, verifyCode, signOut, deleteAccount, refresh, wake,
     loadHistory, activity, exportData, flushNow,
-    weekStart, goal, activeGroups, targetOf, currentWeek, countsIn, tiles, summary, stepsIn, historyRows,
+    weekStart, goal, activeGroups, muscleGroups, trainings, targetOf, currentWeek, countsIn, tiles, summary, stepsIn, historyRows,
     tap, setGoal, setSetting, saveGroupList, completeSetup, removeEntry, undo,
     lastUndo: () => s.undo.at(-1) || null,
     closeRecap, setShowTips,
