@@ -71,7 +71,7 @@ export function setsView(ctx) {
         el('h1', { class: title.length > 10 ? 'long' : null, text: title }),
         el('p', { class: 'week-meta', text: weekSubtitle(w, isCurrent) })),
       !isCurrent
-        ? el('button', { type: 'button', class: 'btn', text: 'Current week', onclick: () => { offset = 0; draw(); } })
+        ? el('button', { type: 'button', class: 'btn', text: 'Back to current week', onclick: () => { offset = 0; draw(); } })
         : !store.muscleGroups().length ? null
         : el('div', { class: 'goal', role: 'group', 'aria-labelledby': 'goal-label' },
           el('span', { class: 'label', id: 'goal-label', text: 'Weekly goal' }),

@@ -243,7 +243,7 @@ ok((await page.locator('h1').textContent()) !== thisWeek, 'the arrow shows the w
 ok((await page.locator('.hint').first().textContent()).startsWith('Past week'), 'past weeks say where new sets go');
 await tile('Biceps').locator('.cell-add').click();
 eq(await count('Biceps'), 1, 'sets can be added to a past week');
-await page.click('text=Current week');
+await page.click('text=Back to current week');
 eq(await count('Biceps'), 0, 'they don’t count for this week');
 await saved();
 d = await db();
