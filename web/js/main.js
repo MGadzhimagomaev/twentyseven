@@ -134,7 +134,7 @@ document.addEventListener('keydown', e => {
   if (!(e.ctrlKey || e.metaKey) || e.shiftKey || e.altKey || e.key.toLowerCase() !== 'z') return;
   const t = e.target;
   if (t instanceof HTMLElement && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
-  if (isSheetOpen() || store.state.phase !== 'ready' || !store.state.settings?.onboarded_at) return;
+  if (isSheetOpen() || document.querySelector('.tour-card') || store.state.phase !== 'ready' || !store.state.settings?.onboarded_at) return;
   e.preventDefault();
   undo();
 });
