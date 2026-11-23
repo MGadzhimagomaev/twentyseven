@@ -321,6 +321,16 @@ await page.waitForSelector('.form-msg');
 ok((await page.locator('.form-msg').textContent()).includes('expired'), 'an expired link is explained');
 ok(!page.url().includes('error'), 'and the address is tidied');
 
+// ---------- the week-start default ----------
+for (const [locale, timezoneId, want] of [['en-US', 'Europe/Berlin', 'monday'], ['en-US', 'America/New_York', 'sunday'], ['de-DE', 'Europe/Berlin', 'monday'], ['en-GB', 'Europe/London', 'monday']]) {
+  const c = await browser.newContext({ locale, timezoneId });
+  const p = await c.newPage();
+  await p.goto(url + 'privacy/');
+  const got = await p.evaluate(async () => (await import('../js/ui/setup.js')).localWeekStart());
+  eq(got, want, `setup suggests ${want} for ${locale} in ${timezoneId}`);
+  await c.close();
+}
+
 eq(errors.length, 0, `no page errors: ${errors.join(' | ')}`);
 await browser.close();
 server.close();

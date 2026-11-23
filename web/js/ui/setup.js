@@ -1,10 +1,13 @@
 // First launch: which groups to track, which day weeks start, and the weekly goal.
 // Each has a choice made already, so "Start tracking" works straight away.
-import { el, ICON, clamp } from '../util.js';
+import { el, ICON, clamp, timeZone } from '../util.js';
 import { BUNDLES } from '../bundles.js';
 
 // Sunday for places whose calendars start the week on Sunday, Monday otherwise.
+// Europe and Australia start on Monday even when the browser speaks US English,
+// so the time zone settles it there before the language is asked.
 export function localWeekStart() {
+  if (/^(Europe|Australia)\//.test(timeZone()) || timeZone() === 'Pacific/Auckland') return 'monday';
   try {
     const loc = new Intl.Locale(navigator.language || 'en-GB');
     const info = loc.getWeekInfo?.() || loc.weekInfo;
