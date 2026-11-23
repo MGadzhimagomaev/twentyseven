@@ -38,8 +38,13 @@ const FILES = [
   'icons/icon-maskable-512.png',
 ];
 
+// 'reload' skips the browser's own cache, which GitHub Pages lets keep files for
+// ten minutes; otherwise a new version could be saved with old files in it.
 self.addEventListener('install', event => {
-  event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(FILES)).then(() => self.skipWaiting()));
+  event.waitUntil(
+    caches.open(CACHE)
+      .then(cache => cache.addAll(FILES.map(f => new Request(f, { cache: 'reload' }))))
+      .then(() => self.skipWaiting()));
 });
 
 self.addEventListener('activate', event => {
