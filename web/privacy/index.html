@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>20/7 · Privacy</title>
+<meta name="description" content="What 20/7 stores, where, and how to export or delete it.">
+<meta name="color-scheme" content="light dark">
+<link rel="icon" href="../icons/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="stylesheet" href="../css/app.css">
+<style>
+  .doc{gap:18px}
+  .doc h1{font-size:40px}
+  .doc h2{font:800 22px/1.1 var(--display);letter-spacing:.02em;text-transform:uppercase;margin:6px 0 2px}
+  .doc p,.doc li{max-width:64ch}
+  .doc ul{margin:0;padding-left:20px;display:grid;gap:6px}
+  .doc .board{padding:16px 16px 18px;display:grid;gap:10px}
+</style>
+</head>
+<body>
+<main class="page doc">
+  <header class="top">
+    <div class="week">
+      <p class="brand"><a href="../" style="color:inherit;text-decoration:none">20/7</a></p>
+      <h1>Privacy</h1>
+      <p class="week-meta">Last updated 23 November 2026</p>
+    </div>
+  </header>
+
+  <section class="board">
+    <p>20/7 is a small personal project for counting sets per muscle group each week. This page says what it stores, why, and how to get it back or delete it.</p>
+
+    <h2>What 20/7 stores</h2>
+    <ul>
+      <li>Your <strong>email address</strong>, to sign you in with a code. There are no passwords.</li>
+      <li>Your <strong>settings</strong>: weekly goal, the day weeks start, daily step goal, time zone.</li>
+      <li>Your <strong>muscle groups</strong> and every <strong>set</strong> you log, with its date and time.</li>
+      <li>A <strong>log of changes</strong>, such as a new goal or a renamed group, so past weeks keep the targets they had.</li>
+      <li>If you use the iPhone app and allow it: your <strong>daily step totals</strong> from Apple Health.</li>
+    </ul>
+
+    <h2>What it doesn't do</h2>
+    <ul>
+      <li>No ads, no analytics, no tracking, no selling or sharing of data.</li>
+      <li>No outside fonts or scripts: everything loads from this site, except the database itself.</li>
+    </ul>
+
+    <h2>Where it lives</h2>
+    <ul>
+      <li>In a database run by <a href="https://supabase.com/privacy">Supabase</a> in the EU (Ireland), which also handles sign-in.</li>
+      <li>Sign-in emails go out through an email-sending service.</li>
+      <li>On your own device, 20/7 keeps a copy of your recent data and any changes not saved yet, so it works without a connection. Signing out removes it.</li>
+    </ul>
+
+    <h2>Who can see it</h2>
+    <p>Only you, through your account: the database lets each person read and change only their own data. The developer can reach the database to run and fix the service, and doesn't look at anyone's data for any other reason.</p>
+
+    <h2>Steps from Apple Health</h2>
+    <p>The iPhone app only reads step counts, only after you allow it, and only to show your own steps and averages. Health data is never used for ads or marketing, never sold, and not stored in iCloud.</p>
+
+    <h2>Your choices</h2>
+    <ul>
+      <li><strong>Export</strong>: Settings › Your data gives every set as a spreadsheet, or everything as a file.</li>
+      <li><strong>Delete</strong>: Settings › Delete account removes your account and all its data right away.</li>
+      <li>You can also ask what is stored about you, or ask for it to be corrected or deleted.</li>
+    </ul>
+
+    <h2>Contact</h2>
+    <p>Ask the person who invited you to the test, or write through <a href="https://github.com/MGadzhimagomaev/twentyseven">the project's GitHub page</a>.</p>
+  </section>
+
+  <footer class="foot"><a href="../">Back to 20/7</a></footer>
+</main>
+</body>
+</html>

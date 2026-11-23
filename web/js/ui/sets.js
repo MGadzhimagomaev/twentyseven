@@ -1,0 +1,198 @@
+// The main screen: this week's sets per group as tally marks. Tap a group to log a
+// set, − to take one off, Undo to take back the last action. The arrows step back
+// through past weeks, which can still be corrected.
+import { el, fill, ICON, compact, dayMonth, plural } from '../util.js';
+import { shiftWeek, weekTitle, weekSubtitle, resetDayName } from '../week.js';
+import { tallySVG } from '../tally.js';
+import { seedOf } from '../bundles.js';
+import { WEEKS_KEPT } from '../store.js';
+import { openEditor } from './editor.js';
+
+export function syncText(s) {
+  const n = s.pending.length;
+  switch (s.sync) {
+    case 'saving': return 'Saving…';
+    case 'offline': return n ? `Offline · ${plural(n, 'change', 'changes')} waiting` : 'Offline';
+    case 'error': return 'Couldn’t save · trying again';
+    case 'expired': return 'Sign-in expired · changes wait on this device';
+    default: return n ? 'Saving…' : 'Saved';
+  }
+}
+
+export function setsView(ctx) {
+  const { store, toast, undo } = ctx;
+  let offset = 0;                 // 0 = this week, -1 = the week before, …
+  let fresh = null;               // the last tap, so its stroke draws in
+  let tip = 0;                    // 1 = "tap a group", 2 = "undo and −"
+
+  const root = el('main', { class: 'page sets' });
+  const week = () => (offset ? shiftWeek(store.currentWeek(), offset) : store.currentWeek());
+
+  function add(group) {
+    if (!store.tap(group.id, 1, week())) return;
+    fresh = { id: group.id, at: Date.now() };
+    if (tip === 1) tip = 2;
+    toast(`${group.name} +1`, { action: 'Undo', onAction: undo });
+  }
+  function takeOne(group) {
+    if (!store.tap(group.id, -1, week())) return;
+    fresh = null;
+    toast(`${group.name} −1`, { action: 'Undo', onAction: undo });
+  }
+  function changeGoal(n) {
+    store.setGoal(n);
+    const groups = store.activeGroups();
+    const own = groups.filter(g => g.own_target != null).length;
+    const goal = store.goal();
+    const text = own
+      ? `Goal ${goal} · ${plural(groups.length - own, 'group follows', 'groups follow')} it, ${own} ${own === 1 ? 'has its' : 'have their'} own`
+      : `Goal ${goal}`;
+    toast(text, { action: 'Undo', onAction: undo });
+  }
+
+  function header(s, w, isCurrent) {
+    const g = s.settings.weekly_goal;
+    const title = weekTitle(w);
+    return el('header', { class: 'top' },
+      el('div', { class: 'top-bar' },
+        el('p', { class: 'brand', text: '20/7' }),
+        el('div', { class: 'week-arrows', role: 'group', 'aria-label': 'Change week' },
+          el('button', {
+            type: 'button', class: 'ibtn', 'aria-label': 'Previous week', html: ICON.left,
+            disabled: offset <= -(WEEKS_KEPT - 1), onclick: () => { offset--; fresh = null; draw(); },
+          }),
+          el('button', {
+            type: 'button', class: 'ibtn', 'aria-label': 'Next week', html: ICON.right,
+            disabled: isCurrent, onclick: () => { offset++; fresh = null; draw(); },
+          }))),
+      el('div', { class: 'week' },
+        el('h1', { class: title.length > 10 ? 'long' : null, text: title }),
+        el('p', { class: 'week-meta', text: weekSubtitle(w, isCurrent) })),
+      isCurrent
+        ? el('div', { class: 'goal', role: 'group', 'aria-labelledby': 'goal-label' },
+          el('span', { class: 'label', id: 'goal-label', text: 'Weekly goal' }),
+          el('div', { class: 'stepper' },
+            el('button', { type: 'button', class: 'step', 'aria-label': 'Lower the weekly goal', html: ICON.minus, disabled: g <= 1, onclick: () => changeGoal(g - 1) }),
+            el('output', { class: 'goal-value', 'aria-live': 'polite', text: g }),
+            el('button', { type: 'button', class: 'step', 'aria-label': 'Raise the weekly goal', html: ICON.plus, disabled: g >= 50, onclick: () => changeGoal(g + 1) })),
+          el('span', { class: 'goal-unit', text: 'sets per group' }))
+        : el('button', { type: 'button', class: 'btn', text: 'Back to this week', onclick: () => { offset = 0; draw(); } }));
+  }
+
+  // The week before, summed up during the first days of a new week.
+  function recap(s, w) {
+    const elapsed = 7 - w.daysLeft;
+    if (s.recapSeen === w.id || elapsed > 2) return null;
+    const last = shiftWeek(w, -1);
+    const sum = store.summary(last);
+    if (!sum.sets) return null;
+    const bits = [`${sum.done} of ${sum.groups} groups at goal`, plural(sum.sets, 'set', 'sets')];
+    if (sum.steps.avg != null) bits.push(`${compact(sum.steps.avg)} steps a day`);
+    return el('section', { class: 'recap', 'aria-label': 'Last week' },
+      el('div', { class: 'recap-body' },
+        el('p', { class: 'label', text: 'Last week' }),
+        el('p', { class: 'recap-line', text: bits.join(' · ') }),
+        el('a', { class: 'recap-link', href: '#history', text: 'See history' })),
+      el('button', { type: 'button', class: 'ibtn', 'aria-label': 'Close', html: ICON.close, onclick: () => store.closeRecap(w.id) }));
+  }
+
+  function stats(s, sum) {
+    const items = [
+      el('p', { class: 'stat' }, el('span', { class: 'label', text: 'Sets' }),
+        el('span', { class: 'stat-value' }, String(sum.sets), el('small', { text: `/${sum.target}` }))),
+      el('p', { class: 'stat' }, el('span', { class: 'label', text: 'At goal' }),
+        el('span', { class: 'stat-value' }, String(sum.done), el('small', { text: `/${sum.groups}` }))),
+    ];
+    if (s.settings.show_steps_on_sets) {
+      const st = sum.steps;
+      items.push(el('p', { class: 'stat', title: st.any ? 'Average steps a day this week' : 'Steps come from the iPhone app' },
+        el('span', { class: 'label', text: 'Steps/day' }),
+        el('span', { class: 'stat-value' }, st.avg != null ? compact(st.avg) : '–', el('small', { text: `/${compact(st.goal)}` }))));
+    }
+    return el('div', { class: `summary cols-${items.length}` }, ...items);
+  }
+
+  function hint(isCurrent, w, sum) {
+    if (tip === 1) {
+      return el('div', { class: 'hint tip' },
+        el('p', { text: 'Tap a group each time you finish a set. Try it now.' }),
+        el('button', { type: 'button', class: 'link-btn', text: 'Skip tips', onclick: () => { tip = 0; store.setShowTips(false); } }));
+    }
+    if (tip === 2) {
+      return el('div', { class: 'hint tip' },
+        el('p', { text: 'Undo takes back your last action. − takes one set off a group.' }),
+        el('button', { type: 'button', class: 'link-btn', text: 'Got it', onclick: () => { tip = 0; store.setShowTips(false); } }));
+    }
+    if (!isCurrent) return el('p', { class: 'hint', text: `Past week. Sets you add here count on ${dayMonth(w.end)}.` });
+    if (!sum.sets) return el('p', { class: 'hint', text: 'Tap a muscle group each time you finish a set.' });
+    return null;
+  }
+
+  function tile(t, index) {
+    const { group: g, count, target, done } = t;
+    const isFresh = fresh && fresh.id === g.id && Date.now() - fresh.at < 800;
+    const over = Math.max(0, count - target);
+    return el('div', { class: index === 0 && tip === 1 ? 'cell coach' : 'cell', 'data-state': done ? 'done' : null },
+      el('button', {
+        type: 'button', class: 'cell-add', 'aria-label': `${g.name}: ${count} of ${target}. Add a set`,
+        onclick: () => add(g),
+      }),
+      el('p', { class: 'cell-name' },
+        el('span', { class: 'cell-label', text: g.name }),
+        t.own ? el('span', { class: 'own', title: 'Own target', 'aria-label': 'own target', html: ICON.lock }) : null,
+        el('span', { class: 'tick-wrap', html: ICON.tick })),
+      el('div', { class: 'cell-row' },
+        el('p', { class: 'count' },
+          el('span', { class: isFresh ? 'n pop' : 'n', text: count }),
+          el('span', { class: 'of', text: `/${target}` }),
+          over ? el('span', { class: 'extra', text: `+${over}` }) : null),
+        el('button', {
+          type: 'button', class: tip === 2 ? 'cell-sub glow' : 'cell-sub', 'aria-label': `Take one set off ${g.name}`,
+          html: ICON.minus, disabled: count <= 0, onclick: () => takeOne(g),
+        })),
+      el('div', { class: 'tally', html: tallySVG(count, target, seedOf(g.id), isFresh ? count - 1 : -1) }));
+  }
+
+  function draw() {
+    const s = store.state;
+    if (!s.settings) return;
+    const w = week();
+    const isCurrent = offset === 0;
+    const sum = store.summary(w);
+    const tiles = store.tiles(w);
+    const last = store.lastUndo();
+
+    const board = el('section', { class: 'board', 'aria-label': isCurrent ? 'Sets this week' : 'Sets that week' },
+      stats(s, sum),
+      hint(isCurrent, w, sum),
+      tiles.length
+        ? el('div', { class: 'grid' }, ...tiles.map(tile))
+        : el('p', { class: 'hint', text: 'No groups yet. Add some in Edit groups.' }),
+      el('div', { class: 'tray' },
+        el('button', { type: 'button', class: 'tray-btn', html: ICON.edit, onclick: () => openEditor(ctx) }, 'Edit groups'),
+        el('button', {
+          type: 'button', class: tip === 2 ? 'tray-btn undo glow' : 'tray-btn undo', html: ICON.undo, disabled: !last,
+          title: last ? `Undo: ${last.label}` : 'Nothing to undo', onclick: undo,
+        }, el('span', { text: 'Undo' }), last ? el('span', { class: 'undo-what', text: last.label }) : null)));
+
+    fill(root,
+      header(s, w, isCurrent),
+      isCurrent ? recap(s, w) : null,
+      board,
+      el('footer', { class: 'foot' },
+        el('p', { class: 'sync', 'data-state': s.sync === 'saved' && s.pending.length ? 'saving' : s.sync },
+          el('span', { class: 'dot' }), el('span', { text: syncText(s) })),
+        el('p', { text: `Resets every ${resetDayName(store.weekStart())} at 00:00` })));
+  }
+
+  return {
+    el: root,
+    update(s) {
+      if (s.showTips && !tip) tip = 1;
+      if (!s.showTips) tip = 0;
+      draw();
+    },
+    // Ctrl/⌘+Z and the toast's Undo land here too, so the screen shows the result.
+    refresh: draw,
+  };
+}

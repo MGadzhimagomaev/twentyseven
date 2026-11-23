@@ -55,11 +55,11 @@ export function range(start, end) {
     : `${dayMonth(start)} – ${dayMonth(end)}`;
 }
 
-// 8432 -> "8.4K", 12000 -> "12K", 950 -> "950"
+// 8432 -> "8.4K", 10500 -> "10.5K", 12000 -> "12K", 950 -> "950"
 export function compact(n) {
   if (n < 1000) return String(Math.round(n));
   const k = n / 1000;
-  const s = k >= 10 ? k.toFixed(0) : k.toFixed(1);
+  const s = k >= 100 ? k.toFixed(0) : k.toFixed(1);
   return (s.endsWith('.0') ? s.slice(0, -2) : s) + 'K';
 }
 
@@ -83,6 +83,12 @@ export function el(tag, attrs = {}, ...children) {
   return node;
 }
 
+// Replaces a node's children, skipping the null and false left by conditional parts.
+export function fill(node, ...children) {
+  node.replaceChildren(...children.flat().filter(c => c != null && c !== false));
+  return node;
+}
+
 export const ICON = {
   minus: '<svg class="icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M5 10h10"/></svg>',
   plus: '<svg class="icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M5 10h10M10 5v10"/></svg>',
@@ -98,4 +104,9 @@ export const ICON = {
   sets: '<svg class="icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M4.5 4v12M8 4v12M11.5 4v12M15 4v12M3 13.5l14-7"/></svg>',
   history: '<svg class="icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M3.5 16.5h13M5.5 13.5V9M9 13.5V5.5M12.5 13.5v-6M16 13.5V3.5"/></svg>',
   settings: '<svg class="icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M3.5 6h8M14.5 6h2M3.5 14h2M8.5 14h8M11.5 4v4M8.5 12v4"/></svg>',
+  undo: '<svg class="icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M7.5 4.5L4 8l3.5 3.5M4 8h7.5a4.5 4.5 0 0 1 0 9H9"/></svg>',
+  close: '<svg class="icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M6 6l8 8M14 6l-8 8"/></svg>',
 };
+
+export const clamp = (n, lo, hi) => Math.min(hi, Math.max(lo, n));
+export const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;

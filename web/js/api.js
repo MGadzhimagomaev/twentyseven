@@ -72,8 +72,11 @@ function supabaseApi() {
         cb(event, toUser(session?.user));
       });
     },
+    // Sends the sign-in email: a 6-digit code once the template has one, otherwise a
+    // link that brings the person back to this page signed in.
     async sendCode(email) {
-      const { error } = await sb.auth.signInWithOtp({ email, options: { shouldCreateUser: true } });
+      const emailRedirectTo = location.origin + location.pathname;
+      const { error } = await sb.auth.signInWithOtp({ email, options: { shouldCreateUser: true, emailRedirectTo } });
       if (error) throw classify(error);
     },
     async verifyCode(email, token) {
