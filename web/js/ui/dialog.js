@@ -29,13 +29,13 @@ export function confirmSheet({ title, text, confirm, cancel = 'Cancel', danger =
   return new Promise(resolve => {
     let answer = false;
     const ok = el('button', { type: 'button', class: danger ? 'btn danger' : 'btn primary', text: confirm, onclick: () => { answer = true; sheet.close(); } });
+    const no = el('button', { type: 'button', class: 'btn', text: cancel, onclick: () => sheet.close() });
     const body = el('div', { class: 'confirm' },
       el('h2', { class: 'sheet-title', text: title }),
       el('p', { class: 'sheet-text', text }),
-      el('div', { class: 'sheet-actions' },
-        el('button', { type: 'button', class: 'btn', text: cancel, onclick: () => sheet.close() }),
-        ok));
+      el('div', { class: 'sheet-actions' }, no, ok));
     const sheet = openSheet(body, { label: title, onClose: () => resolve(answer) });
-    ok.focus();
+    // Enter should never confirm something that can't be undone.
+    (danger ? no : ok).focus();
   });
 }

@@ -352,6 +352,13 @@ eq(new URL(page.url()).hash, '#sets', 'after signing in the app opens on Sets, n
 await page.click('.tab[href="#settings"]');
 await page.click('button.btn.danger:has-text("Delete account")');
 await page.waitForSelector('dialog.sheet[open] .confirm');
+ok((await page.locator('.sheet-text').textContent()).startsWith('You will lose all your data'), 'deleting asks first and says all data goes');
+await shot('13-delete-confirm');
+await page.keyboard.press('Enter');
+await page.waitForSelector('dialog.sheet', { state: 'detached' });
+ok(!!(await db()).users[me], 'Enter cancels instead of deleting');
+await page.click('button.btn.danger:has-text("Delete account")');
+await page.waitForSelector('dialog.sheet[open] .confirm');
 await page.click('text=Delete everything');
 await page.waitForSelector('#auth-email');
 d = await db();

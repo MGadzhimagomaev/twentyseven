@@ -83,7 +83,7 @@ export function settingsView(ctx) {
   async function deleteAccount() {
     const yes = await confirmSheet({
       title: 'Delete your account?', confirm: 'Delete everything', danger: true,
-      text: 'This deletes your account and every set, step count and setting in it, right away. It can’t be undone. Export first if you want a copy.',
+      text: 'You will lose all your data: every set, training, step count and setting. This can’t be undone. Export first if you want a copy.',
     });
     if (!yes) return;
     try {
