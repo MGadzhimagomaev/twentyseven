@@ -127,8 +127,8 @@ export function settingsView(ctx) {
 
       el('section', { class: 'board panel', 'aria-labelledby': 'set-help' },
         el('h2', { class: 'panel-title', id: 'set-help', text: 'Help' }),
-        row('Tips', 'The two tips from your first launch.',
-          el('button', { type: 'button', class: 'btn', text: 'Show the tips again', onclick: () => { store.setShowTips(true); go('sets'); } }))),
+        row('Tour', 'A quick walk through the Sets screen, as on your first launch.',
+          el('button', { type: 'button', class: 'btn', text: 'Show the tour again', onclick: () => { store.setShowTips(true); go('sets'); } }))),
 
       el('section', { class: 'board panel', 'aria-labelledby': 'set-data' },
         el('h2', { class: 'panel-title', id: 'set-data', text: 'Your data' }),

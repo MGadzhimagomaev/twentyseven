@@ -1,4 +1,4 @@
-// Sign-in: email first, then the 6-digit code from the email. A link in the email
+// Sign-in: email first, then the code from the email. A link in the email
 // works too: it opens this page already signed in.
 import { el } from '../util.js';
 import { classify } from '../api.js';
@@ -92,14 +92,14 @@ export function authView({ store }) {
   function codeStep() {
     const input = el('input', {
       class: 'input code', id: 'auth-code', type: 'text', name: 'code', inputmode: 'numeric', autocomplete: 'one-time-code',
-      pattern: '[0-9]*', maxlength: '10', required: true, placeholder: '123456',
+      pattern: '[0-9]*', maxlength: '10', required: true, placeholder: 'Code',
     });
     const form = el('form', {
       class: 'auth-form', novalidate: true,
       onsubmit: async e => {
         e.preventDefault();
         const code = input.value.replace(/\D/g, '');
-        if (code.length < 6) { message = 'Enter the 6-digit code from the email.'; draw(); return; }
+        if (code.length < 6) { message = 'Enter the whole code from the email.'; draw(); return; }
         if (busy) return;
         message = '';
         setBusy(form, true);
@@ -113,14 +113,19 @@ export function authView({ store }) {
         }
       },
     },
-    el('label', { class: 'label', for: 'auth-code', text: '6-digit code' }),
+    el('label', { class: 'label', for: 'auth-code', text: 'Code from the email' }),
     input,
     el('button', { class: 'btn primary wide', type: 'submit', text: 'Sign in' }),
     message ? el('p', { class: 'form-msg', role: 'alert', text: message }) : null);
+    // Codes can be 6 to 10 digits, so typing never sends early. A code pasted or
+    // filled in from the email arrives all at once and is sent straight away.
+    let before = '';
     input.addEventListener('input', () => {
       const digits = input.value.replace(/\D/g, '');
       if (digits !== input.value) input.value = digits;
-      if (digits.length === 6 && !busy) form.requestSubmit();
+      const typed = digits.startsWith(before) && digits.length - before.length <= 1;
+      before = digits;
+      if (digits.length >= 6 && !typed && !busy) form.requestSubmit();
     });
 
     const wait = Math.max(0, RESEND_AFTER - Math.floor((Date.now() - sentAt) / 1000));

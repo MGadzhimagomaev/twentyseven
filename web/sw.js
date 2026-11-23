@@ -25,6 +25,7 @@ const FILES = [
   'js/ui/settings.js',
   'js/ui/setup.js',
   'js/ui/toast.js',
+  'js/ui/tour.js',
   'vendor/supabase-2.119.0.js',
   'fonts/atkinson-hyperlegible-next-latin-400-normal.woff2',
   'fonts/atkinson-hyperlegible-next-latin-700-normal.woff2',

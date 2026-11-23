@@ -20,7 +20,7 @@ Web app: https://mgadzhimagomaev.github.io/twentyseven/
 
 Supabase (Postgres with sign-in), EU region. Every table only lets a person read and write their own rows. The web app and the iPhone app use the public (publishable) key; the secret key never goes into this repository.
 
-Sign-in is by email: a 6-digit code once the email templates in `supabase/email/` are in place (they need your own email sender), a link until then. The app accepts both.
+Sign-in is by email: a one-time code once the email templates in `supabase/email/` are in place (they need your own email sender), a link until then. The app accepts both.
 
 ## Running the web app locally
 

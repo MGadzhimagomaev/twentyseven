@@ -4,7 +4,8 @@
 //
 // usage: node tests/web/run.mjs [folder for screenshots]
 import { createRequire } from 'node:module';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync, statSync } from 'node:fs';
+import path from 'node:path';
 import assert from 'node:assert/strict';
 import { serve } from './server.mjs';
 
@@ -16,6 +17,14 @@ const shots = process.argv[2];
 let checks = 0;
 const ok = (cond, msg) => { assert.ok(cond, msg); checks++; };
 const eq = (a, b, msg) => { assert.equal(a, b, msg); checks++; };
+
+// ---------- the offline file list matches the files ----------
+const webDir = new URL('../../web/', import.meta.url).pathname;
+const listed = [...readFileSync(path.join(webDir, 'sw.js'), 'utf8').matchAll(/^  '([^']+)',$/gm)].map(m => m[1]);
+const walk = dir => readdirSync(dir).flatMap(f => statSync(path.join(dir, f)).isDirectory() ? walk(path.join(dir, f)) : [path.join(dir, f)]);
+const files = walk(webDir).map(f => path.relative(webDir, f)).filter(f => !f.endsWith('.txt') && f !== 'sw.js');
+for (const f of files) ok(listed.includes(f) || (f.endsWith('index.html') && listed.includes(path.dirname(f) + '/')), `sw.js caches ${f}`);
+for (const f of listed) ok(f === './' || f.endsWith('/') || files.includes(f), `sw.js lists a file that exists: ${f}`);
 
 const { server, url } = await serve();
 const browser = await chromium.launch();
@@ -57,11 +66,17 @@ ok((await fake(() => window.__fake.sent)).includes('marat@example.com'), 'the em
 await page.reload();
 await page.waitForSelector('#auth-code');
 ok(true, 'the code step survives a reload (trip to the mail app)');
-await page.fill('#auth-code', '654321');
+ok(!/6-digit/.test(await page.locator('.auth-card').textContent()), 'no fixed code length is promised');
+await fake(() => { window.__fake.code = '48151623'; });     // an 8-digit code, as Supabase can send
+await page.type('#auth-code', '481516');
+await page.waitForTimeout(300);
+eq(await page.locator('.form-msg').count(), 0, 'typing six digits of a longer code doesn’t send it early');
+await page.fill('#auth-code', '87654321');
 await page.waitForSelector('.form-msg');
-ok((await page.locator('.form-msg').textContent()).includes('wrong or has expired'), 'a wrong code is explained');
-await page.fill('#auth-code', '123456');
+ok((await page.locator('.form-msg').textContent()).includes('wrong or has expired'), 'a pasted wrong code is sent and explained');
+await page.fill('#auth-code', '48151623');
 await page.waitForSelector('.setup');
+ok(true, 'a pasted 8-digit code signs in');
 
 // ---------- setup ----------
 eq(await page.locator('h1').textContent(), 'Set up', 'first launch shows setup');
@@ -81,15 +96,28 @@ let d = await db(), me = await uid();
 ok(d.settings[me].onboarded_at && d.settings[me].weekly_goal === 18 && d.settings[me].bundle === 'extended', 'setup saved');
 eq(d.changes[me].length, 0, 'setup choices are not logged as changes');
 
-// ---------- tips ----------
-ok((await page.locator('.hint.tip').textContent()).includes('Tap a group'), 'tip 1 shows after setup');
-await shot('03-sets-tip');
+// ---------- the tour ----------
+const tourStep = async () => `${await page.locator('.tour-count').textContent()} ${await page.locator('.tour-title').textContent()}`;
+await page.waitForSelector('.tour-card');
+eq(await tourStep(), '1 of 8 Log a set', 'the tour starts after setup');
+await shot('03-tour');
 await tile('Legs').locator('.cell-add').click();
-ok((await page.locator('.hint.tip').textContent()).includes('Undo takes back'), 'tip 2 follows the first tap');
-await page.click('text=Got it');
-eq(await page.locator('.hint.tip').count(), 0, 'tips close');
+eq(await tourStep(), '2 of 8 One too many?', 'logging a real set moves the tour on');
+eq(await count('Legs'), 1, 'the tour’s set is a real set');
+await page.click('.tour-next');
+eq(await tourStep(), '3 of 8 Undo', 'then Undo');
+await page.click('.tray-btn.undo');
+eq(await count('Legs'), 0, 'Undo works during the tour');
+eq(await tourStep(), '4 of 8 Weekly goal', 'using Undo moves the tour on');
+const seen = [];
+for (let i = 4; i < 8; i++) { await page.click('.tour-next'); seen.push(await page.locator('.tour-title').textContent()); }
+eq(seen.join(', '), 'Your groups, Past weeks, History, Settings', 'the tour covers groups, past weeks, history and settings');
+eq(await page.locator('.tour-next').textContent(), 'Done', 'the last step ends with Done');
+await page.click('.tour-next');
+eq(await page.locator('.tour-card').count(), 0, 'the tour closes');
 
 // ---------- logging and undo ----------
+await tile('Legs').locator('.cell-add').click();
 for (let i = 0; i < 3; i++) await tile('Chest').locator('.cell-add').click();
 eq(await count('Chest'), 3, 'three taps, three sets');
 eq(await toastText(), 'Chest +1', 'each tap says what it did');
@@ -236,6 +264,13 @@ await page.click('[aria-label="Raise the daily step goal"]');
 eq(await toastText(), 'Step goal 10,500', 'step goal changes by 500');
 await page.click('[role="switch"]');
 await shot('07-settings');
+await page.click('text=Show the tour again');
+await page.waitForSelector('.tour-card');
+eq(await tourStep(), '1 of 8 Log a set', 'the tour can be shown again from Settings');
+await page.click('text=Skip tour');
+eq(await page.locator('.tour-card').count(), 0, 'and skipped');
+await page.click('.tab[href="#settings"]');
+await page.waitForSelector('.settings');
 await page.click('.tab[href="#sets"]');
 await page.waitForSelector('.grid');
 ok(/\d/.test(await page.locator('h1').textContent()) && !/^Week/.test(await page.locator('h1').textContent()), 'Sunday weeks show their dates');

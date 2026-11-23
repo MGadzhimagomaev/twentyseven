@@ -7,6 +7,7 @@ import { tallySVG } from '../tally.js';
 import { seedOf } from '../bundles.js';
 import { WEEKS_KEPT } from '../store.js';
 import { openEditor } from './editor.js';
+import { createTour } from './tour.js';
 
 export function syncText(s) {
   const n = s.pending.length;
@@ -23,7 +24,8 @@ export function setsView(ctx) {
   const { store, toast, undo } = ctx;
   let offset = 0;                 // 0 = this week, -1 = the week before, …
   let fresh = null;               // the last tap, so its stroke draws in
-  let tip = 0;                    // 1 = "tap a group", 2 = "undo and −"
+  let tour = null;                // the first-launch tour, while it runs
+  let tappedId = null;            // the group tapped during the tour, for the − step
 
   const root = el('main', { class: 'page sets' });
   const week = () => (offset ? shiftWeek(store.currentWeek(), offset) : store.currentWeek());
@@ -31,7 +33,7 @@ export function setsView(ctx) {
   function add(group) {
     if (!store.tap(group.id, 1, week())) return;
     fresh = { id: group.id, at: Date.now() };
-    if (tip === 1) tip = 2;
+    if (tour?.step?.id === 'log') { tappedId = group.id; tour.next(); return; }
     toast(`${group.name} +1`, { action: 'Undo', onAction: undo });
   }
   function takeOne(group) {
@@ -113,16 +115,6 @@ export function setsView(ctx) {
   }
 
   function hint(isCurrent, w, sum) {
-    if (tip === 1) {
-      return el('div', { class: 'hint tip' },
-        el('p', { text: 'Tap a group each time you finish a set. Try it now.' }),
-        el('button', { type: 'button', class: 'link-btn', text: 'Skip tips', onclick: () => { tip = 0; store.setShowTips(false); } }));
-    }
-    if (tip === 2) {
-      return el('div', { class: 'hint tip' },
-        el('p', { text: 'Undo takes back your last action. − takes one set off a group.' }),
-        el('button', { type: 'button', class: 'link-btn', text: 'Got it', onclick: () => { tip = 0; store.setShowTips(false); } }));
-    }
     if (!isCurrent) return el('p', { class: 'hint', text: `Past week. Sets you add here count on ${dayMonth(w.end)}.` });
     if (!sum.sets) return el('p', { class: 'hint', text: 'Tap a muscle group each time you finish a set.' });
     return null;
@@ -132,7 +124,7 @@ export function setsView(ctx) {
     const { group: g, count, target, done } = t;
     const isFresh = fresh && fresh.id === g.id && Date.now() - fresh.at < 800;
     const over = Math.max(0, count - target);
-    return el('div', { class: index === 0 && tip === 1 ? 'cell coach' : 'cell', 'data-state': done ? 'done' : null },
+    return el('div', { class: 'cell', 'data-id': g.id, 'data-state': done ? 'done' : null },
       el('button', {
         type: 'button', class: 'cell-add', 'aria-label': `${g.name}: ${count} of ${target}. Add a set`,
         onclick: () => add(g),
@@ -147,7 +139,7 @@ export function setsView(ctx) {
           el('span', { class: 'of', text: `/${target}` }),
           over ? el('span', { class: 'extra', text: `+${over}` }) : null),
         el('button', {
-          type: 'button', class: tip === 2 ? 'cell-sub glow' : 'cell-sub', 'aria-label': `Take one set off ${g.name}`,
+          type: 'button', class: 'cell-sub', 'aria-label': `Take one set off ${g.name}`,
           html: ICON.minus, disabled: count <= 0, onclick: () => takeOne(g),
         })),
       el('div', { class: 'tally', html: tallySVG(count, target, seedOf(g.id), isFresh ? count - 1 : -1) }));
@@ -169,9 +161,9 @@ export function setsView(ctx) {
         ? el('div', { class: 'grid' }, ...tiles.map(tile))
         : el('p', { class: 'hint', text: 'No groups yet. Add some in Edit groups.' }),
       el('div', { class: 'tray' },
-        el('button', { type: 'button', class: 'tray-btn', html: ICON.edit, onclick: () => openEditor(ctx) }, 'Edit groups'),
+        el('button', { type: 'button', class: 'tray-btn edit', html: ICON.edit, onclick: () => openEditor(ctx) }, 'Edit groups'),
         el('button', {
-          type: 'button', class: tip === 2 ? 'tray-btn undo glow' : 'tray-btn undo', html: ICON.undo, disabled: !last,
+          type: 'button', class: 'tray-btn undo', html: ICON.undo, disabled: !last,
           title: last ? `Undo: ${last.label}` : 'Nothing to undo', onclick: undo,
         }, el('span', { text: 'Undo' }), last ? el('span', { class: 'undo-what', text: last.label }) : null)));
 
@@ -185,14 +177,41 @@ export function setsView(ctx) {
         el('p', { text: `Resets every ${resetDayName(store.weekStart())} at 00:00` })));
   }
 
+  function startTour() {
+    const ws = store.weekStart() === 'sunday' ? 'Sunday' : 'Monday';
+    const q = sel => () => root.querySelector(sel) || document.querySelector(sel);
+    tour = createTour([
+      { id: 'log', target: q('.grid .cell'), title: 'Log a set',
+        text: 'Tap a group each time you finish a set. Try it now.' },
+      { id: 'minus', target: () => root.querySelector(`.cell[data-id="${tappedId}"] .cell-sub`) || root.querySelector('.cell-sub'), title: 'One too many?',
+        text: '− takes one set off a group.' },
+      { id: 'undo', target: q('.tray-btn.undo'), title: 'Undo',
+        text: 'Undo takes back your last action: a set, a goal change, a group edit. Tap it again to go further back.' },
+      { id: 'goal', target: q('.goal'), title: 'Weekly goal',
+        text: 'How many sets each group should get this week. Every group follows it, unless it has its own target.' },
+      { id: 'edit', target: q('.tray-btn.edit'), title: 'Your groups',
+        text: 'Rename, add, remove or reorder groups here. The lock gives a group its own target, so the weekly goal doesn’t change it.' },
+      { id: 'weeks', target: q('.week-arrows'), title: 'Past weeks',
+        text: `Counts start over every ${ws} at 00:00. The arrows step back through earlier weeks, where you can still add sets you forgot.` },
+      { id: 'history', target: q('.tab[href="#history"]'), title: 'History',
+        text: 'Every week at a glance, charts for sets and steps, and a log where you can remove a set.' },
+      { id: 'settings', target: q('.tab[href="#settings"]'), title: 'Settings',
+        text: 'Week start, step goal, export, and this tour again.' },
+    ], { onEnd: () => { tour = null; store.setShowTips(false); } });
+  }
+
   return {
     el: root,
     update(s) {
-      if (s.showTips && !tip) tip = 1;
-      if (!s.showTips) tip = 0;
+      if (offset && s.showTips && !tour) offset = 0;
       draw();
+      if (s.showTips && !tour) startTour();
+      else if (!s.showTips && tour) tour.end();
+      tour?.place();
     },
-    // Ctrl/⌘+Z and the toast's Undo land here too, so the screen shows the result.
-    refresh: draw,
+    afterUndo() {
+      if (tour?.step?.id === 'undo') tour.next();
+    },
+    destroy() { tour?.end(); },
   };
 }

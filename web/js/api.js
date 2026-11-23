@@ -72,7 +72,7 @@ function supabaseApi() {
         cb(event, toUser(session?.user));
       });
     },
-    // Sends the sign-in email: a 6-digit code once the template has one, otherwise a
+    // Sends the sign-in email: a one-time code once the template has one, otherwise a
     // link that brings the person back to this page signed in.
     async sendCode(email) {
       const emailRedirectTo = location.origin + location.pathname;
