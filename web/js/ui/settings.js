@@ -3,7 +3,7 @@ import { el, ICON, clamp, number, isoDate, plural } from '../util.js';
 import { bundleByKey } from '../bundles.js';
 import { APP_VERSION } from '../config.js';
 import { openEditor } from './editor.js';
-import { confirmSheet } from './dialog.js';
+import { confirmSheet, openSheet } from './dialog.js';
 import { classify } from '../api.js';
 
 const DAY_NAME = { monday: 'Monday', sunday: 'Sunday' };
@@ -80,6 +80,42 @@ export function settingsView(ctx) {
     await store.signOut();
   }
 
+  function openFeedback() {
+    let busy = false;
+    const area = el('textarea', {
+      class: 'input area', rows: '6', maxlength: '4000', 'aria-label': 'Your feedback',
+      placeholder: 'What works, what doesn’t, what’s missing…',
+    });
+    const msg = el('p', { class: 'form-msg', role: 'alert' });
+    const send = el('button', { type: 'submit', class: 'btn primary', text: 'Send' });
+    const form = el('form', {
+      class: 'confirm',
+      onsubmit: async e => {
+        e.preventDefault();
+        const text = area.value.trim();
+        if (!text) { msg.textContent = 'Write something first.'; return; }
+        if (busy) return;
+        busy = true; send.disabled = true; send.textContent = 'Sending…'; msg.textContent = '';
+        try {
+          await store.sendFeedback(text, 'settings');
+          sheet.close();
+          toast('Thanks! Your feedback was sent.');
+        } catch (err) {
+          busy = false; send.disabled = false; send.textContent = 'Send';
+          msg.textContent = classify(err).kind === 'network' ? 'Sending needs a connection. Your text is still here.' : 'Couldn’t send it. Try again.';
+        }
+      },
+    },
+    el('h2', { class: 'sheet-title', text: 'Send feedback' }),
+    el('p', { class: 'sheet-text', text: 'Bugs, ideas, anything. It goes to the developer with your email address, so you can get a reply.' }),
+    area, msg,
+    el('div', { class: 'sheet-actions' },
+      el('button', { type: 'button', class: 'btn', text: 'Cancel', onclick: () => sheet.close() }),
+      send));
+    const sheet = openSheet(form, { label: 'Send feedback' });
+    area.focus();
+  }
+
   async function deleteAccount() {
     const yes = await confirmSheet({
       title: 'Delete your account?', confirm: 'Delete everything', danger: true,
@@ -128,6 +164,8 @@ export function settingsView(ctx) {
 
       el('section', { class: 'board panel', 'aria-labelledby': 'set-help' },
         el('h2', { class: 'panel-title', id: 'set-help', text: 'Help' }),
+        row('Feedback', 'Bugs, ideas, anything. It goes straight to the developer.',
+          el('button', { type: 'button', class: 'btn', html: ICON.message, onclick: openFeedback }, 'Send feedback')),
         row('Tour', 'A quick walk through the Sets screen, as on your first launch.',
           el('button', { type: 'button', class: 'btn', text: 'Show the tour again', onclick: () => { store.setShowTips(true); go('sets'); } }))),
 

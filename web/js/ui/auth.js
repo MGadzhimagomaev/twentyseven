@@ -77,16 +77,37 @@ export function authView({ store }) {
         send(form);
       },
     },
-    el('label', { class: 'label', for: 'auth-email', text: 'Email' }),
+    el('label', { class: 'sr-only', for: 'auth-email', text: 'Email' }),
     input,
     el('button', { class: 'btn primary wide', type: 'submit', text: 'Send sign-in email' }),
     message ? el('p', { class: 'form-msg', role: 'alert', text: message }) : null);
     queueMicrotask(() => input.focus());
-    return el('div', { class: 'auth-card' },
-      el('p', { class: 'brand', text: '20/7' }),
-      el('h1', { text: 'Sign in' }),
-      el('p', { class: 'lead', text: 'Count your sets for each muscle group, every week. No password: we email you a code.' }),
-      form);
+    return el('div', { class: 'auth-card welcome' },
+      el('h1', { class: 'hero', text: '20/7' }),
+      el('p', { class: 'tagline', text: '20 sets for each muscle group, every 7 days.' }),
+      el('ul', { class: 'welcome-list' },
+        el('li', { text: 'Tap a group each time you finish a set. Gym or home, it all counts.' }),
+        el('li', { text: 'Watch each group fill up over the week. Then it starts over.' }),
+        el('li', { text: 'Pick your own goal, or one per group, and count workouts like runs too.' })),
+      whyTwenty(),
+      el('h2', { class: 'auth-title', text: 'Start with your email' }),
+      form,
+      el('p', { class: 'muted small', text: 'No password: we email you a code. New here? The same email creates your account.' }));
+  }
+
+  // The story behind the app and the number, one tap away.
+  function whyTwenty() {
+    const link = (text, href) => el('a', { href, target: '_blank', rel: 'noopener', text });
+    return el('details', { class: 'why' },
+      el('summary', { text: 'Why 20/7?' }),
+      el('p', { text: 'I was struggling to keep track of all my different kinds of training in one place. Then I came across this approach by chance and tried it: count the sets each muscle group gets in a week, wherever they happen. It finally let me track everything together. I started in my notes, ended up building this app for myself, and now I’m sharing it in case it helps someone else. It’s minimal on purpose.' }),
+      el('p', {},
+        'Research points the same way. A 2022 review suggests 12–20 sets per muscle a week as a good target for growth, ',
+        'and a 2024 analysis found that more sets keep helping, just a little less each time.'),
+      el('p', { class: 'why-sources' },
+        link('Baz-Valle et al., 2022', 'https://pmc.ncbi.nlm.nih.gov/articles/PMC8884877/'), ' · ',
+        link('Pelland et al., 2024 (preprint)', 'https://sportrxiv.org/index.php/server/preprint/download/460/967/908')),
+      el('p', { text: 'If the research ever changes its mind, I’ll rename the app. Until then, 20 works for me.' }));
   }
 
   function codeStep() {

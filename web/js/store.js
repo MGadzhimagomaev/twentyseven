@@ -5,6 +5,7 @@ import { uuid, isoDate, addDays, timeZone } from './util.js';
 import { weekOf } from './week.js';
 import { bundleByKey, matchBundle, idFor, cleanName, isTraining, TRAINING_TARGET } from './bundles.js';
 import { classify } from './api.js';
+import { APP_VERSION } from './config.js';
 
 const CACHE = 'twentyseven.v2.';
 export const WEEKS_KEPT = 12;            // weeks of sets kept on the device; Sets can step back through them
@@ -207,6 +208,9 @@ export function createStore(api) {
     await flushNow();
     return api.activityLog(offset, limit);
   }
+
+  // Needs a connection; the caller keeps the text if it fails.
+  const sendFeedback = (message, page) => api.sendFeedback({ message, page, app_version: APP_VERSION });
 
   async function exportData() {
     await flushNow();
@@ -548,7 +552,7 @@ export function createStore(api) {
     subscribe(fn) { listeners.add(fn); return () => listeners.delete(fn); },
     onNotice(fn) { noticeListeners.add(fn); return () => noticeListeners.delete(fn); },
     init, sendCode, verifyCode, signOut, deleteAccount, refresh, wake,
-    loadHistory, activity, exportData, flushNow,
+    loadHistory, activity, exportData, flushNow, sendFeedback,
     weekStart, goal, activeGroups, muscleGroups, trainings, targetOf, currentWeek, countsIn, tiles, summary, stepsIn, historyRows,
     tap, setGoal, setSetting, saveGroupList, completeSetup, removeEntry, undo,
     lastUndo: () => s.undo.at(-1) || null,

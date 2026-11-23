@@ -8,6 +8,7 @@ import { seedOf } from '../bundles.js';
 import { WEEKS_KEPT } from '../store.js';
 import { openEditor } from './editor.js';
 import { createTour } from './tour.js';
+import { installCard, onInstallChange } from './install.js';
 
 export function syncText(s) {
   const n = s.pending.length;
@@ -28,6 +29,7 @@ export function setsView(ctx) {
   let tappedId = null;            // the group tapped during the tour, for the − step
 
   const root = el('main', { class: 'page sets' });
+  const stopInstall = onInstallChange(() => draw());
   const week = () => (offset ? shiftWeek(store.currentWeek(), offset) : store.currentWeek());
 
   function add(group) {
@@ -185,6 +187,7 @@ export function setsView(ctx) {
     fill(root,
       header(s, w, isCurrent),
       isCurrent ? recap(s, w) : null,
+      isCurrent && !s.showTips && !tour ? installCard(draw) : null,
       board,
       el('footer', { class: 'foot' },
         el('p', { class: 'sync', 'data-state': s.sync === 'saved' && s.pending.length ? 'saving' : s.sync },
@@ -247,6 +250,6 @@ export function setsView(ctx) {
     afterUndo() {
       if (tour?.step?.id === 'undo') tour.next();
     },
-    destroy() { tour?.end(); },
+    destroy() { tour?.end(); stopInstall(); },
   };
 }

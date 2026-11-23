@@ -106,6 +106,9 @@ export const ICON = {
   settings: '<svg class="icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M3.5 6h8M14.5 6h2M3.5 14h2M8.5 14h8M11.5 4v4M8.5 12v4"/></svg>',
   undo: '<svg class="icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M7.5 4.5L4 8l3.5 3.5M4 8h7.5a4.5 4.5 0 0 1 0 9H9"/></svg>',
   close: '<svg class="icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M6 6l8 8M14 6l-8 8"/></svg>',
+  share: '<svg class="icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M10 12.5V3M6.8 6.2L10 3l3.2 3.2M7 9H5v8h10V9h-2"/></svg>',
+  install: '<svg class="icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M10 3v9.5M6.5 9L10 12.5 13.5 9M4.5 16.5h11"/></svg>',
+  message: '<svg class="icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M3.5 5h13v8.5H9l-3.5 3v-3h-2z"/></svg>',
 };
 
 export const clamp = (n, lo, hi) => Math.min(hi, Math.max(lo, n));

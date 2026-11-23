@@ -21,6 +21,7 @@ const FILES = [
   'js/ui/dialog.js',
   'js/ui/editor.js',
   'js/ui/history.js',
+  'js/ui/install.js',
   'js/ui/sets.js',
   'js/ui/settings.js',
   'js/ui/setup.js',

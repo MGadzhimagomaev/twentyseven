@@ -113,6 +113,9 @@ function supabaseApi() {
         .order('happened_at', { ascending: false })
         .range(offset, offset + limit - 1)),
 
+    // Feedback is saved in the database, which also emails it to the developer.
+    sendFeedback: row => run(sb.from('feedback').insert({ ...row, user_id: uid })),
+
     async exportAll() {
       return {
         settings: await run(sb.from('settings').select('*').maybeSingle()),

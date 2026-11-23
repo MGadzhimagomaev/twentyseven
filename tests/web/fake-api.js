@@ -150,6 +150,12 @@
       ].sort((a, b) => b.happened_at.localeCompare(a.happened_at));
       return rows.slice(offset, offset + limit);
     }),
+    sendFeedback: row => call('sendFeedback', () => {
+      const db = load();
+      (db.feedback ||= {})[me()] ||= [];
+      db.feedback[me()].push({ ...row, created_at: new Date().toISOString() });
+      save(db);
+    }),
     exportAll: () => call('exportAll', () => {
       const db = load(), uid = me();
       return { settings: db.settings[uid], groups: db.groups[uid], sets: db.entries[uid], steps: db.steps[uid], changes: db.changes[uid] };

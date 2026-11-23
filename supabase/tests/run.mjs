@@ -28,6 +28,13 @@ const STUB = `
     $$ select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
   grant usage on schema auth, public to anon, authenticated;
   grant execute on function auth.uid() to anon, authenticated;
+  -- Stand-ins for Supabase Vault and pg_net: secrets in a table, requests logged.
+  create schema vault;
+  create table vault.decrypted_secrets (name text primary key, decrypted_secret text);
+  create schema net;
+  create table net.calls (url text, headers jsonb, body jsonb);
+  create function net.http_post(url text, body jsonb default '{}', params jsonb default '{}', headers jsonb default '{}', timeout_milliseconds int default 5000)
+    returns bigint language sql as $$ insert into net.calls values (url, headers, body) returning 1::bigint $$;
 `;
 // No default grants: the migration has to grant everything the app needs itself,
 // as on a project where "Grant API access to new tables automatically" is off.
@@ -243,9 +250,23 @@ rows = await grid(A);
 ok(at(w2, 'running').target === 3, 'a training keeps its own target in weeks before it was added, not the goal of sets');
 ok(at(w2, 'legs').target === 18, 'muscle groups still follow the goal that week');
 
+// ---------- feedback ----------
+await as(A, `insert into public.feedback (message, app_version, page) values ('Love it', '0.1.0', 'settings')`);
+ok(one(await sys(`select count(*)::int as n from public.feedback where user_id = $1`, [A])).n === 1, 'feedback is saved');
+ok(one(await sys(`select count(*)::int as n from net.calls`)).n === 0, 'no email before the Resend key is stored');
+await sys(`insert into vault.decrypted_secrets values ('resend_api_key', 're_test'), ('feedback_email', 'dev@example.com')`);
+await as(A, `insert into public.feedback (message) values ('Found a bug')`);
+const mail = one(await sys(`select * from net.calls`));
+ok(mail && mail.url === 'https://api.resend.com/emails' && mail.headers.Authorization === 'Bearer re_test', 'feedback is emailed through Resend');
+ok(mail.body.to[0] === 'dev@example.com' && mail.body.reply_to === 'a@example.com' && mail.body.text.startsWith('Found a bug'), 'the email goes to the developer, with the sender to reply to');
+ok(one(await as(B, `select count(*)::int as n from public.feedback`)).n === 0, 'B can\'t read A\'s feedback');
+await asFails(B, `insert into public.feedback (user_id, message) values ($1, 'fake')`, [A], /row-level security/);
+await asFails(A, `insert into public.feedback (message) values ('')`, [], /check constraint/);
+await sys(`delete from vault.decrypted_secrets`);
+
 // ---------- account deletion ----------
 await as(A, `select public.delete_my_account()`);
-for (const t of ['settings', 'muscle_groups', 'set_entries', 'daily_steps', 'changes']) {
+for (const t of ['settings', 'muscle_groups', 'set_entries', 'daily_steps', 'changes', 'feedback']) {
   ok(one(await sys(`select count(*)::int as n from public.${t} where user_id = $1`, [A])).n === 0, `A's ${t} deleted`);
 }
 ok(one(await sys(`select count(*)::int as n from public.settings where user_id = $1`, [B])).n === 1, 'B is untouched');

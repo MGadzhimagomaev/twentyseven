@@ -52,7 +52,11 @@ async function shot(name) {
 // ---------- sign-in ----------
 await page.goto(url);
 await page.waitForSelector('#auth-email');
-eq(await page.locator('h1').textContent(), 'Sign in', 'signed-out people see the sign-in screen');
+eq(await page.locator('h1').textContent(), '20/7', 'signed-out people see the welcome page');
+eq(await page.locator('.tagline').textContent(), '20 sets for each muscle group, every 7 days.', 'it says what 20/7 means');
+await page.click('summary:has-text("Why 20/7?")');
+ok((await page.locator('.why').textContent()).includes('in my notes'), 'Why 20/7? tells the story');
+ok((await page.locator('.why').textContent()).includes('12–20 sets per muscle a week') && await page.locator('.why a').count() === 2, 'and the research, with sources');
 await shot('01-sign-in');
 await page.fill('#auth-email', 'blocked@example.com');
 await page.click('text=Send sign-in email');
@@ -305,6 +309,23 @@ await page.click('[aria-label="Raise the daily step goal"]');
 eq(await toastText(), 'Step goal 10,500', 'step goal changes by 500');
 await page.click('[role="switch"]');
 await shot('07-settings');
+// ---------- feedback ----------
+await page.click('button:has-text("Send feedback")');
+await page.waitForSelector('dialog.sheet[open] textarea');
+await page.click('dialog.sheet[open] button[type="submit"]');
+ok((await page.locator('dialog.sheet[open] .form-msg').textContent()).includes('Write something'), 'empty feedback is not sent');
+await page.fill('dialog.sheet[open] textarea', 'Love the tally marks');
+await fake(() => { window.__fake.offline = true; });
+await page.click('dialog.sheet[open] button[type="submit"]');
+await page.waitForFunction(() => document.querySelector('dialog.sheet[open] .form-msg')?.textContent.includes('connection'));
+eq(await page.inputValue('dialog.sheet[open] textarea'), 'Love the tally marks', 'offline, the feedback text stays');
+await fake(() => { window.__fake.offline = false; });
+await page.click('dialog.sheet[open] button[type="submit"]');
+await page.waitForSelector('dialog.sheet', { state: 'detached' });
+ok((await toastText()).startsWith('Thanks!'), 'sending feedback says thanks');
+const fb = (await db()).feedback?.[me] || [];
+ok(fb.length === 1 && fb[0].message === 'Love the tally marks' && fb[0].app_version && fb[0].page === 'settings', 'feedback reaches the database with the app version');
+
 await page.click('text=Show the tour again');
 await page.waitForSelector('.tour-card');
 eq(await tourStep(), '1 of 12 Log a set', 'the tour can be shown again from Settings');
@@ -401,6 +422,30 @@ ok(!page.url().includes('error'), 'and the address is tidied');
   if (shots) await p.screenshot({ path: `${shots}/12-trainings-only.png` });
   await p.click('text=Skip tour');
   ok((await p.locator('.hint').textContent()).includes('Tap a workout'), 'the hint speaks of trainings');
+  await c.close();
+}
+
+// ---------- the home-screen hint ----------
+{
+  const c = await browser.newContext({ ...require('playwright').devices['iPhone 13'], locale: 'de-DE', timezoneId: 'Europe/Berlin' });
+  await c.addInitScript(fakeSrc);
+  const p = await c.newPage();
+  p.on('pageerror', e => errors.push(e.message));
+  await p.goto(url);
+  await p.evaluate(() => window.__fake.signIn('phone@example.com'));
+  await p.waitForSelector('.setup');
+  await p.click('text=Start tracking');
+  await p.waitForSelector('.tour-card');
+  eq(await p.locator('.install').count(), 0, 'no install hint during the tour');
+  await p.click('text=Skip tour');
+  await p.waitForSelector('.install');
+  ok((await p.locator('.install').textContent()).includes('Add to Home Screen'), 'iPhone gets the Add to Home Screen steps');
+  if (shots) await p.screenshot({ path: `${shots}/14-install-hint.png` });
+  await p.click('.install .ibtn');
+  eq(await p.locator('.install').count(), 0, 'the hint can be closed');
+  await p.reload();
+  await p.waitForSelector('.grid');
+  eq(await p.locator('.install').count(), 0, 'and stays closed');
   await c.close();
 }
 

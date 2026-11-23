@@ -272,6 +272,28 @@ h1.long{font-size:36px}
 .form-msg{color:var(--over);font-weight:700;font-size:14px}
 .auth-links{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}
 
+.welcome{gap:12px}
+.hero{margin:0;font:800 96px/.82 var(--display);letter-spacing:-.005em;color:var(--mark)}
+.tagline{font:800 26px/1.05 var(--display);letter-spacing:.02em;text-transform:uppercase}
+.welcome-list{margin:2px 0 0;padding:0;list-style:none;display:grid;gap:8px}
+.welcome-list li{position:relative;padding-left:26px;color:var(--ink-2);font-size:15.5px}
+.welcome-list li::before{content:"";position:absolute;left:2px;top:3px;width:14px;height:15px;
+  background:linear-gradient(var(--mark),var(--mark)) 1px 0/2px 100% no-repeat,linear-gradient(var(--mark),var(--mark)) 5px 0/2px 100% no-repeat,
+  linear-gradient(var(--mark),var(--mark)) 9px 0/2px 100% no-repeat,linear-gradient(var(--mark),var(--mark)) 13px 0/2px 100% no-repeat;opacity:.85}
+.why{border:1.5px solid var(--rule);border-radius:14px;padding:0 14px;background:var(--board)}
+.why summary{cursor:pointer;padding:12px 0;font-weight:700;color:var(--mark)}
+.why[open]{padding-bottom:12px}
+.why p{color:var(--ink-2);font-size:14.5px;margin-top:6px}
+.why-sources{font-size:13px}
+.auth-title{margin-top:10px;font:700 11px/1.2 var(--body);letter-spacing:.09em;text-transform:uppercase;color:var(--ink-2)}
+.welcome .auth-form{margin-top:0}
+.input.area{height:auto;min-height:140px;padding:12px 14px;font-size:16px;line-height:1.4;resize:vertical}
+.install{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;padding:12px 10px 12px 14px;border-radius:16px;background:var(--board);border:1.5px dashed var(--frame)}
+.install-body{display:grid;gap:6px;justify-items:start}
+.install-line{font-size:14.5px}
+.install-line .inline-icon,.tour-text .inline-icon{display:inline-grid;place-items:center;vertical-align:-4px;width:24px;height:24px;margin:0 1px;border-radius:7px;border:1px solid var(--rule);color:var(--ink)}
+.install-line .inline-icon .icon{width:15px;height:15px}
+
 /* ---------- setup ---------- */
 .setup-step{display:grid;gap:12px;padding:14px}
 .step-title{display:flex;align-items:center;gap:10px;font:800 22px/1.05 var(--display);letter-spacing:.02em;text-transform:uppercase}
