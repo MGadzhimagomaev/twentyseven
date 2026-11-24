@@ -30,6 +30,7 @@ export function classify(error, status = undefined) {
 }
 
 const toUser = u => (u ? { id: u.id, email: u.email } : null);
+const SOURCE = 'web';              // this app, as sets and changes record it
 
 function supabaseApi() {
   if (!window.supabase?.createClient) throw new ApiError('other', 'The Supabase library did not load.');
@@ -93,11 +94,12 @@ function supabaseApi() {
 
     loadSettings: () => run(sb.from('settings').select('*').maybeSingle()),
     createSettings: () => run(sb.from('settings').upsert({ user_id: uid }, { onConflict: 'user_id', ignoreDuplicates: true })),
-    saveSettings: patch => run(sb.from('settings').update(patch).eq('user_id', uid)),
+    // `source` tells the change log where a change came from.
+    saveSettings: patch => run(sb.from('settings').update({ ...patch, source: SOURCE }).eq('user_id', uid)),
 
     loadGroups: () => run(sb.from('muscle_groups').select('id,name,kind,position,own_target,archived_at,created_at').order('position')),
     // Rows always carry every column, so an upsert never trips a NOT NULL check.
-    saveGroups: rows => run(sb.from('muscle_groups').upsert(rows.map(r => ({ ...r, user_id: uid })), { onConflict: 'user_id,id' })),
+    saveGroups: rows => run(sb.from('muscle_groups').upsert(rows.map(r => ({ ...r, source: SOURCE, user_id: uid })), { onConflict: 'user_id,id' })),
 
     loadEntries: fromDate => all(() => sb.from('set_entries').select('id,group_id,delta,local_date,logged_at,source').gte('local_date', fromDate).order('logged_at')),
     // An entry that already arrived is skipped, so retries never count twice.
