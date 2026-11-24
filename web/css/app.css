@@ -131,7 +131,7 @@ h1.long{font-size:36px}
 @media (hover:hover){.tray-btn:not(:disabled):hover{color:var(--ink);background:var(--hover)}}
 .tray-btn.primary,.tray-btn.primary:hover{background:var(--mark);color:var(--on-mark);padding:0 18px}
 .tray-btn.undo{max-width:62%}
-.undo-what{font-weight:400;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.undo-what{font-weight:400;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;line-height:1.35}
 
 .recap{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;padding:12px 10px 12px 14px;border-radius:16px;
   background:color-mix(in oklab,var(--mark) 8%,var(--board));border:1.5px solid color-mix(in oklab,var(--mark) 35%,var(--frame))}
@@ -224,7 +224,7 @@ h1.long{font-size:36px}
 
 /* ---------- group editor ---------- */
 .ed-head{display:grid;gap:6px;padding:16px 14px 12px;border-bottom:1px solid var(--rule)}
-.ed-head-row{display:flex;align-items:baseline;justify-content:space-between;gap:12px}
+.ed-head-row{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:4px 12px}
 .ed-count{font-size:13px;color:var(--ink-2);white-space:nowrap}
 .ed-note{color:var(--ink-2);font-size:14px;max-width:60ch}
 .ed-presets{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;padding:10px 14px;border-bottom:1px solid var(--rule)}
@@ -276,7 +276,7 @@ h1.long{font-size:36px}
 .hero{margin:0;font:800 96px/.82 var(--display);letter-spacing:-.005em;color:var(--mark)}
 .tagline{font:800 26px/1.05 var(--display);letter-spacing:.02em;text-transform:uppercase}
 .welcome-list{margin:2px 0 0;padding:0;list-style:none;display:grid;gap:8px}
-.welcome-list li{position:relative;padding-left:26px;color:var(--ink-2);font-size:15.5px}
+.welcome-list li{text-wrap:pretty;position:relative;padding-left:26px;color:var(--ink-2);font-size:15.5px}
 .welcome-list li::before{content:"";position:absolute;left:2px;top:3px;width:14px;height:15px;
   background:linear-gradient(var(--mark),var(--mark)) 1px 0/2px 100% no-repeat,linear-gradient(var(--mark),var(--mark)) 5px 0/2px 100% no-repeat,
   linear-gradient(var(--mark),var(--mark)) 9px 0/2px 100% no-repeat,linear-gradient(var(--mark),var(--mark)) 13px 0/2px 100% no-repeat;opacity:.85}
@@ -287,6 +287,13 @@ h1.long{font-size:36px}
 .why-sources{font-size:13px}
 .auth-title{margin-top:10px;font:700 11px/1.2 var(--body);letter-spacing:.09em;text-transform:uppercase;color:var(--ink-2)}
 .welcome .auth-form{margin-top:0}
+/* Chinese and Japanese headings break at punctuation rather than inside a word. */
+:lang(zh) :is(h1,h2,h3,.tagline,.sheet-title,.tour-title),:lang(ja) :is(h1,h2,h3,.tagline,.sheet-title,.tour-title){word-break:keep-all;overflow-wrap:anywhere}
+.select-wrap{position:relative;display:inline-flex;align-items:center;max-width:100%}
+.select{min-height:42px;max-width:100%;padding:0 36px 0 13px;border:1.5px solid var(--frame);border-radius:12px;background:var(--board);color:var(--ink);font:700 14px/1 var(--body);-webkit-appearance:none;appearance:none;cursor:pointer}
+.select-chev{position:absolute;right:11px;pointer-events:none;color:var(--ink-2)}
+.select-chev .icon{width:16px;height:16px}
+.lang-pick{display:flex;align-items:center;gap:8px;margin-top:2px;color:var(--ink-2)}
 .input.area{height:auto;min-height:140px;padding:12px 14px;font-size:16px;line-height:1.4;resize:vertical}
 .install{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;padding:12px 10px 12px 14px;border-radius:16px;background:var(--board);border:1.5px dashed var(--frame)}
 .install-body{display:grid;gap:6px;justify-items:start}
@@ -343,7 +350,7 @@ h1.long{font-size:36px}
 .heat{display:grid;gap:3px;padding:6px 14px 4px;--name:84px}
 .heat-row{display:grid;grid-template-columns:var(--name) repeat(var(--cols),minmax(0,1fr));gap:3px;align-items:center}
 .heat-name{display:flex;align-items:center;min-width:0;height:26px;padding-right:6px;text-align:left;font:700 14px/1 var(--display);letter-spacing:.05em;text-transform:uppercase;color:var(--ink)}
-.heat-name span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.heat-name span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.4}
 .heat-name .removed{color:var(--ink-2);text-decoration:line-through;text-decoration-thickness:1.5px}
 .heat-name.on{color:var(--mark);text-decoration:underline;text-underline-offset:3px}
 .hc{display:grid;place-items:center;height:22px;border-radius:4px;background:var(--tray);border:0;padding:0;color:var(--on-mark)}

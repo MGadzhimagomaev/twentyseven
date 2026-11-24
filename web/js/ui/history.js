@@ -1,11 +1,10 @@
 // History: the last 12 weeks as a grid of groups by week, sets per week against the
 // target, steps per week, and one group at a time. The Log lists every action,
 // newest first, and a mistaken set can be removed from it.
-import { el, ICON, compact, number, range, dayMonth, weekday, time, isoDate, addDays, plural } from '../util.js';
+import { el, ICON, compact, number, range, axisDate, weekdayDayMonth, time, isoDate, addDays } from '../util.js';
+import { t } from '../i18n.js';
 import { weekTitle, isoWeekNumber, weekStartOf } from '../week.js';
 import { WEEKS_KEPT } from '../store.js';
-
-const DAY_NAME = { monday: 'Monday', sunday: 'Sunday' };
 
 // 0 none · 1–4 a quarter of the target each · 5 at goal (also ticked).
 const levelOf = (sets, target) => (sets <= 0 ? 0 : sets >= target ? 5 : 1 + Math.min(3, Math.floor((sets / target) * 4)));
@@ -29,9 +28,8 @@ function barChart({ items, refLine, refLabel, unit, fmt = number, label }) {
   function say(i, focus = false) {
     const d = items[i];
     if (!d) return;
-    const [one, many] = Array.isArray(unit) ? unit : [unit, unit];
-    const bits = [d.title, d.value == null ? 'no data' : `${fmt(d.value)} ${d.value === 1 ? one : many}`];
-    if (d.target != null) bits.push(`target ${fmt(d.target)}`);
+    const bits = [d.title, d.value == null ? t('chart.no_data') : t(unit, { n: d.value, value: fmt(d.value) })];
+    if (d.target != null) bits.push(t('chart.target', { value: fmt(d.target) }));
     if (d.note) bits.push(d.note);
     readout.textContent = bits.join(' · ');
     for (const b of plot.querySelectorAll('[data-i]')) b.classList.toggle('dim', focus && Number(b.dataset.i) !== i);
@@ -90,9 +88,16 @@ function barChart({ items, refLine, refLabel, unit, fmt = number, label }) {
   return wrap;
 }
 
+// "▮ Sets ▮ At goal ─ Target" under a chart.
+function chartKey(value, atGoal, target) {
+  return el('p', { class: 'chart-key' },
+    el('span', { class: 'key-bar' }), `${value} `, el('span', { class: 'key-bar done' }), atGoal,
+    target ? [' ', el('span', { class: 'key-line' }), target] : null);
+}
+
 function tableView(head, rows) {
   return el('details', { class: 'table-view' },
-    el('summary', { text: 'Show as a table' }),
+    el('summary', { text: t('history.table') }),
     el('div', { class: 'table-scroll' },
       el('table', {},
         el('thead', {}, el('tr', {}, ...head.map(h => el('th', { scope: 'col', text: h })))),
@@ -106,26 +111,26 @@ function logText(r) {
       const d = Number(r.new_value);
       return `${name} ${d > 0 ? '+' : '−'}${Math.abs(d)}`;
     }
-    case 'weekly_goal': return `Weekly goal ${r.old_value} → ${r.new_value}`;
-    case 'step_goal': return `Step goal ${number(Number(r.old_value))} → ${number(Number(r.new_value))}`;
-    case 'week_start': return `Weeks now start on ${DAY_NAME[r.new_value] || r.new_value}`;
+    case 'weekly_goal': return t('log.weekly_goal', { old: r.old_value, new: r.new_value });
+    case 'step_goal': return t('log.step_goal', { old: number(Number(r.old_value)), new: number(Number(r.new_value)) });
+    case 'week_start': return r.new_value === 'sunday' || r.new_value === 'monday' ? t(`log.week_start_${r.new_value}`) : r.kind;
     case 'group_target':
-      if (r.new_value == null) return `${name} follows the weekly goal again`;
-      if (r.old_value == null) return `${name} gets its own target: ${r.new_value}`;
-      return `${name} target ${r.old_value} → ${r.new_value}`;
-    case 'group_added': return `Added ${r.new_value || name}`;
-    case 'group_renamed': return `Renamed ${r.old_value} to ${r.new_value}`;
-    case 'group_removed': return `Removed ${name}`;
-    case 'group_restored': return `Brought back ${name}`;
+      if (r.new_value == null) return t('log.target_follows', { name });
+      if (r.old_value == null) return t('log.target_own', { name, value: r.new_value });
+      return t('log.target_change', { name, old: r.old_value, new: r.new_value });
+    case 'group_added': return t('log.added', { name: r.new_value || name });
+    case 'group_renamed': return t('log.renamed', { old: r.old_value, new: r.new_value });
+    case 'group_removed': return t('log.removed', { name });
+    case 'group_restored': return t('log.restored', { name });
     default: return r.kind;
   }
 }
 
 function dayHeading(day) {
   const today = isoDate();
-  if (day === today) return 'Today';
-  if (day === addDays(today, -1)) return 'Yesterday';
-  return `${weekday(day)} ${dayMonth(day)}`;
+  if (day === today) return t('log.today');
+  if (day === addDays(today, -1)) return t('log.yesterday');
+  return weekdayDayMonth(day);
 }
 
 export function historyView(ctx) {
@@ -161,7 +166,7 @@ export function historyView(ctx) {
     store.removeEntry(r);
     log = log.filter(x => x !== r);
     draw();
-    toast(`${logText(r)} removed`, { action: 'Undo', onAction: () => { undo(); } });
+    toast(t('undo.removed', { what: logText(r) }), { action: t('common.undo'), onAction: () => { undo(); } });
   }
 
   function axisWeeks() {
@@ -174,8 +179,8 @@ export function historyView(ctx) {
     const rows = store.historyRows();
     if (!rows) {
       return el('section', { class: 'board panel' },
-        el('p', { class: 'hint', text: s.historyError ? (s.historyError.kind === 'network' ? 'History needs a connection the first time.' : 'Couldn’t load history.') : 'Loading history…' }),
-        s.historyError ? el('div', { class: 'tray' }, el('button', { type: 'button', class: 'tray-btn', text: 'Try again', onclick: () => store.loadHistory(true) })) : null);
+        el('p', { class: 'hint', text: t(s.historyError ? (s.historyError.kind === 'network' ? 'history.offline_first' : 'history.load_failed') : 'history.loading') }),
+        s.historyError ? el('div', { class: 'tray' }, el('button', { type: 'button', class: 'tray-btn', text: t('common.try_again'), onclick: () => store.loadHistory(true) })) : null);
     }
     const weeks = axisWeeks();
     const ws = store.weekStart();
@@ -190,29 +195,30 @@ export function historyView(ctx) {
     // Muscle groups first, then trainings; removed ones at the end of each.
     const list = [...groups.values()].sort((a, b) => (a.training - b.training) || (a.archived - b.archived) || (a.position - b.position));
     if (!list.length) {
-      return el('section', { class: 'board panel' }, el('p', { class: 'hint', text: 'Nothing yet. Your weeks show up here once you log something.' }));
+      return el('section', { class: 'board panel' }, el('p', { class: 'hint', text: t('history.empty') }));
     }
-    const unitOf = g => (g.training ? ['workout', 'workouts'] : ['set', 'sets']);
+    const unitOf = g => (g.training ? 'unit.workouts' : 'unit.sets');
+    const removedName = g => (g.archived ? t('history.removed_name', { name: g.name }) : g.name);
     const firstTraining = list.find(g => g.training);
 
     // Groups by week.
-    const label = w => `${dayMonth(w)}`;
+    const label = axisDate;
     const head = el('div', { class: 'heat-row heat-head', 'aria-hidden': 'true' }, el('span', {}),
       ...weeks.map((w, i) => el('span', { class: 'heat-x', text: (WEEKS_KEPT - 1 - i) % 3 === 0 ? label(w) : '' })));
     const heat = el('div', { class: 'heat', style: `--cols:${weeks.length}` },
       ...list.flatMap(g => [
-        g === firstTraining && list[0] !== g ? el('p', { class: 'label heat-section', text: 'Workouts' }) : null,
+        g === firstTraining && list[0] !== g ? el('p', { class: 'label heat-section', text: t('stats.workouts') }) : null,
         el('div', { class: 'heat-row' },
         el('button', {
           type: 'button', class: selected === g.id ? 'heat-name on' : 'heat-name', 'aria-pressed': String(selected === g.id),
-          title: g.archived ? `${g.name} (removed)` : `${g.name}, week by week`, onclick: () => { selected = selected === g.id ? null : g.id; draw(); },
-          'aria-label': g.archived ? `${g.name} (removed), week by week` : `${g.name}, week by week`,
+          title: g.archived ? removedName(g) : t('history.name_by_week', { name: g.name }), onclick: () => { selected = selected === g.id ? null : g.id; draw(); },
+          'aria-label': t('history.name_by_week', { name: removedName(g) }),
         }, el('span', { class: g.archived ? 'removed' : null, text: g.name })),
         ...weeks.map(w => {
           const c = g.cells.get(w);
           if (!c) return el('span', { class: 'hc none', 'aria-hidden': 'true' });
           const lv = levelOf(c.sets, c.target);
-          const text = `${g.name}, ${range(w, addDays(w, 6))}: ${c.sets} of ${c.target} ${unitOf(g)[1]}`;
+          const text = t(g.training ? 'history.cell_workouts' : 'history.cell_sets', { name: g.name, range: range(w, addDays(w, 6)), count: c.sets, n: c.target });
           const show = () => { cellNote = text; const n = root.querySelector('.heat-note'); if (n) n.textContent = text; };
           return el('button', {
             type: 'button', class: 'hc', 'data-l': String(lv), 'aria-label': text,
@@ -221,11 +227,11 @@ export function historyView(ctx) {
         }))]),
       head);
     const legend = el('div', { class: 'heat-legend', 'aria-hidden': 'true' },
-      el('span', { text: 'Share of target' }),
+      el('span', { text: t('history.share') }),
       ...[1, 2, 3, 4].map(l => el('span', { class: 'hc', 'data-l': String(l) })),
-      el('span', { class: 'hc', 'data-l': '5', html: ICON.tick }), el('span', { text: 'at goal' }));
-    const heatTable = tableView(['Name', ...weeks.map(label)],
-      list.map(g => [g.name + (g.archived ? ' (removed)' : ''), ...weeks.map(w => { const c = g.cells.get(w); return c ? `${c.sets}/${c.target}` : '–'; })]));
+      el('span', { class: 'hc', 'data-l': '5', html: ICON.tick }), el('span', { text: t('history.at_goal_legend') }));
+    const heatTable = tableView([t('history.name'), ...weeks.map(label)],
+      list.map(g => [removedName(g), ...weeks.map(w => { const c = g.cells.get(w); return c ? `${c.sets}/${c.target}` : '–'; })]));
 
     // One group, week by week.
     let groupPanel = null;
@@ -235,15 +241,14 @@ export function historyView(ctx) {
         const c = sel.cells.get(w);
         return { title: titleOf(w), short: label(w), value: c ? c.sets : null, target: c ? c.target : null };
       });
-      const [, many] = unitOf(sel);
-      const Many = many[0].toUpperCase() + many.slice(1);
+      const Many = t(sel.training ? 'stats.workouts' : 'stats.sets');
       groupPanel = el('section', { class: 'board panel' },
         el('div', { class: 'panel-head' },
-          el('h2', { class: 'panel-title', text: `${sel.name}, week by week` }),
-          el('button', { type: 'button', class: 'ibtn', 'aria-label': 'Close', html: ICON.close, onclick: () => { selected = null; draw(); } })),
-        barChart({ items, unit: unitOf(sel), label: `${sel.name}: ${many} per week against its target` }),
-        el('p', { class: 'chart-key' }, el('span', { class: 'key-bar' }), `${Many} `, el('span', { class: 'key-bar done' }), 'At goal ', el('span', { class: 'key-line' }), 'Target'),
-        tableView(['Week', Many, 'Target'], items.map(d => [d.short, d.value ?? '–', d.target ?? '–'])));
+          el('h2', { class: 'panel-title', text: t('history.name_by_week', { name: sel.name }) }),
+          el('button', { type: 'button', class: 'ibtn', 'aria-label': t('common.close'), html: ICON.close, onclick: () => { selected = null; draw(); } })),
+        barChart({ items, unit: unitOf(sel), label: t(sel.training ? 'history.group_chart_workouts' : 'history.group_chart_sets', { name: sel.name }) }),
+        chartKey(Many, t('stats.at_goal'), t('history.target_key')),
+        tableView([t('history.week'), Many, t('history.target_key')], items.map(d => [d.short, d.value ?? '–', d.target ?? '–'])));
     }
 
     // All muscle groups together, and all trainings together: never mixed.
@@ -255,12 +260,11 @@ export function historyView(ctx) {
         sets += c.sets; target += c.target; n++;
         if (c.sets >= c.target) done++;
       }
-      const [one, many] = what;
-      return { title: titleOf(w), short: label(w), value: n ? sets : null, target: n ? target : null, note: n ? `${done} of ${n} ${n === 1 ? one : many} at goal` : '' };
+      return { title: titleOf(w), short: label(w), value: n ? sets : null, target: n ? target : null, note: n ? t(what, { done, n }) : '' };
     });
     const muscleList = list.filter(g => !g.training), trainingList = list.filter(g => g.training);
-    const totals = totalsOf(muscleList, ['group', 'groups']);
-    const trainingTotals = totalsOf(trainingList, ['workout', 'workouts']);
+    const totals = totalsOf(muscleList, 'recap.groups');
+    const trainingTotals = totalsOf(trainingList, 'history.workouts_at_goal');
 
     // Steps, from the iPhone app.
     const stepRows = new Map((s.history.steps || []).map(r => [r.week_start, r]));
@@ -271,36 +275,36 @@ export function historyView(ctx) {
       const days = r ? Number(r.days_logged) : 0;
       return {
         title: titleOf(w), short: label(w), value: days ? Math.round(Number(r.avg_steps)) : null,
-        note: days ? `goal reached on ${plural(Number(r.days_at_goal), 'day', 'days')} of ${days}` : '',
+        note: days ? t('history.steps_days', { n: Number(r.days_at_goal), days }) : '',
       };
     });
 
     return el('div', { class: 'stack' },
       el('section', { class: 'board panel' },
-        el('h2', { class: 'panel-title', text: 'Week by week' }),
-        el('p', { class: 'panel-note', text: 'Each square is one week. Darker means closer to the target. Tap a name for its own chart.' }),
+        el('h2', { class: 'panel-title', text: t('history.week_by_week') }),
+        el('p', { class: 'panel-note', text: t('history.week_by_week_note') }),
         heat,
-        el('p', { class: 'readout heat-note', 'aria-live': 'polite', text: cellNote || 'Tap a square to see its count.' }),
+        el('p', { class: 'readout heat-note', 'aria-live': 'polite', text: cellNote || t('history.tap_square') }),
         legend,
         heatTable),
       groupPanel,
       muscleList.length ? el('section', { class: 'board panel' },
-        el('h2', { class: 'panel-title', text: 'Sets per week' }),
-        barChart({ items: totals, unit: ['set', 'sets'], label: 'Total sets per week against the total target' }),
-        el('p', { class: 'chart-key' }, el('span', { class: 'key-bar' }), 'Sets, all groups ', el('span', { class: 'key-bar done' }), 'At goal ', el('span', { class: 'key-line' }), 'Target'),
-        tableView(['Week', 'Sets', 'Target', 'Groups at goal'], totals.map(d => [d.short, d.value ?? '–', d.target ?? '–', d.note || '–']))) : null,
+        el('h2', { class: 'panel-title', text: t('history.sets_per_week') }),
+        barChart({ items: totals, unit: 'unit.sets', label: t('history.sets_chart') }),
+        chartKey(t('history.key_all_groups'), t('stats.at_goal'), t('history.target_key')),
+        tableView([t('history.week'), t('stats.sets'), t('history.target_key'), t('history.groups_at_goal')], totals.map(d => [d.short, d.value ?? '–', d.target ?? '–', d.note || '–']))) : null,
       trainingList.length ? el('section', { class: 'board panel' },
-        el('h2', { class: 'panel-title', text: 'Workouts per week' }),
-        barChart({ items: trainingTotals, unit: ['workout', 'workouts'], label: 'Workouts per week against their targets' }),
-        el('p', { class: 'chart-key' }, el('span', { class: 'key-bar' }), 'All workouts ', el('span', { class: 'key-bar done' }), 'At goal ', el('span', { class: 'key-line' }), 'Target'),
-        tableView(['Week', 'Workouts', 'Target', 'Workouts at goal'], trainingTotals.map(d => [d.short, d.value ?? '–', d.target ?? '–', d.note || '–']))) : null,
+        el('h2', { class: 'panel-title', text: t('history.workouts_per_week') }),
+        barChart({ items: trainingTotals, unit: 'unit.workouts', label: t('history.workouts_chart') }),
+        chartKey(t('history.key_all_workouts'), t('stats.at_goal'), t('history.target_key')),
+        tableView([t('history.week'), t('stats.workouts'), t('history.target_key'), t('history.workouts_at_goal_head')], trainingTotals.map(d => [d.short, d.value ?? '–', d.target ?? '–', d.note || '–']))) : null,
       el('section', { class: 'board panel' },
-        el('h2', { class: 'panel-title', text: 'Steps per day, weekly average' }),
+        el('h2', { class: 'panel-title', text: t('history.steps_title') }),
         anySteps
-          ? barChart({ items: stepItems, unit: ['step a day', 'steps a day'], refLine: stepGoal, refLabel: `Goal ${compact(stepGoal)}`, label: 'Average steps per day for each week' })
-          : el('p', { class: 'panel-note', text: 'Steps come from the iPhone app. They show here once it has synced.' }),
-        anySteps ? el('p', { class: 'chart-key' }, el('span', { class: 'key-bar' }), 'Steps a day ', el('span', { class: 'key-bar done' }), 'At goal') : null,
-        anySteps ? tableView(['Week', 'Steps a day', 'Days at goal'], stepItems.map(d => [d.short, d.value == null ? '–' : number(d.value), d.note || '–'])) : null));
+          ? barChart({ items: stepItems, unit: 'unit.steps', refLine: stepGoal, refLabel: t('history.goal_ref', { value: compact(stepGoal) }), label: t('history.steps_chart') })
+          : el('p', { class: 'panel-note', text: t('history.steps_empty') }),
+        anySteps ? chartKey(t('history.key_steps'), t('stats.at_goal')) : null,
+        anySteps ? tableView([t('history.week'), t('history.key_steps'), t('history.days_at_goal')], stepItems.map(d => [d.short, d.value == null ? '–' : number(d.value), d.note || '–'])) : null));
   }
 
   const SETTINGS_KINDS = new Set(['weekly_goal', 'group_target', 'step_goal', 'week_start']);
@@ -308,7 +312,7 @@ export function historyView(ctx) {
   function periodOf(day) {
     const ws = store.weekStart();
     const start = weekStartOf(day, ws), end = addDays(start, 6);
-    return ws === 'sunday' ? range(start, end) : `Week ${isoWeekNumber(start)} · ${range(start, end)}`;
+    return ws === 'sunday' ? range(start, end) : `${t('week.title', { n: isoWeekNumber(start) })} · ${range(start, end)}`;
   }
 
   function logPanel() {
@@ -326,37 +330,37 @@ export function historyView(ctx) {
         // The week each entry counts for: sets in their week, goal and target
         // changes from the week they took effect.
         const period = periodOf(r.local_date);
-        const when = r.kind === 'set' ? period : SETTINGS_KINDS.has(r.kind) ? `From ${period}` : period;
-        const from = r.kind === 'set' && r.source === 'ios' ? 'iPhone' : r.kind === 'set' && r.source === 'import' ? 'imported' : '';
+        const when = SETTINGS_KINDS.has(r.kind) ? t('log.from', { period }) : period;
+        const from = r.source === 'ios' ? t('log.iphone') : r.source === 'import' ? t('log.imported') : '';
         return el('li', { class: `log-row kind-${r.kind}` },
           el('span', { class: 'log-time', text: time(r.happened_at) }),
           el('span', { class: 'log-text' }, el('span', { text: logText(r) }),
             el('span', { class: 'log-meta', text: [when, from].filter(Boolean).join(' · ') })),
           r.kind === 'set'
-            ? el('button', { type: 'button', class: 'ibtn small', 'aria-label': `Remove ${logText(r)} from ${time(r.happened_at)}`, html: ICON.remove, onclick: () => removeSet(r) })
+            ? el('button', { type: 'button', class: 'ibtn small', 'aria-label': t('log.remove_aria', { what: logText(r), time: time(r.happened_at) }), html: ICON.remove, onclick: () => removeSet(r) })
             : el('span', {}));
       }))));
     return el('section', { class: 'board panel log' },
-      el('h2', { class: 'panel-title', text: 'Activity' }),
-      el('p', { class: 'panel-note', text: 'Every change, newest first. Remove a set logged by mistake with ×.' }),
+      el('h2', { class: 'panel-title', text: t('log.title') }),
+      el('p', { class: 'panel-note', text: t('log.note') }),
       ...items,
-      logError ? el('p', { class: 'hint', text: logError.kind === 'network' ? 'The log needs a connection.' : 'Couldn’t load the log.' }) : null,
-      !logLoading && logLoaded && !log.length ? el('p', { class: 'hint', text: 'Nothing here yet.' }) : null,
+      logError ? el('p', { class: 'hint', text: t(logError.kind === 'network' ? 'log.offline' : 'log.load_failed') }) : null,
+      !logLoading && logLoaded && !log.length ? el('p', { class: 'hint', text: t('log.empty') }) : null,
       el('div', { class: 'tray' },
-        logLoading ? el('span', { class: 'muted small', text: 'Loading…' })
-          : logError ? el('button', { type: 'button', class: 'tray-btn', text: 'Try again', onclick: () => loadLog(log.length === 0) })
-            : !logDone ? el('button', { type: 'button', class: 'tray-btn', text: 'Show older', onclick: () => loadLog() }) : el('span', {})));
+        logLoading ? el('span', { class: 'muted small', text: t('app.loading') })
+          : logError ? el('button', { type: 'button', class: 'tray-btn', text: t('common.try_again'), onclick: () => loadLog(log.length === 0) })
+            : !logDone ? el('button', { type: 'button', class: 'tray-btn', text: t('log.older'), onclick: () => loadLog() }) : el('span', {})));
   }
 
   function draw() {
     const s = store.state;
     if (!s.settings) return;
-    const tabs = el('div', { class: 'seg tabs-seg', role: 'tablist', 'aria-label': 'History views' },
-      el('button', { type: 'button', role: 'tab', class: 'seg-btn', 'aria-selected': String(tab === 'weeks'), text: 'Weeks', onclick: () => go('history') }),
-      el('button', { type: 'button', role: 'tab', class: 'seg-btn', 'aria-selected': String(tab === 'log'), text: 'Log', onclick: () => go('history/log') }));
+    const tabs = el('div', { class: 'seg tabs-seg', role: 'tablist', 'aria-label': t('history.views') },
+      el('button', { type: 'button', role: 'tab', class: 'seg-btn', 'aria-selected': String(tab === 'weeks'), text: t('history.weeks'), onclick: () => go('history') }),
+      el('button', { type: 'button', role: 'tab', class: 'seg-btn', 'aria-selected': String(tab === 'log'), text: t('history.log'), onclick: () => go('history/log') }));
     root.replaceChildren(
       el('header', { class: 'top' },
-        el('div', { class: 'week' }, el('p', { class: 'brand', text: '20/7' }), el('h1', { text: 'History' })),
+        el('div', { class: 'week' }, el('p', { class: 'brand', text: '20/7' }), el('h1', { text: t('history.title') })),
         tabs),
       tab === 'weeks' ? weeksPanel() : logPanel());
     for (const c of root.querySelectorAll('.chart')) c.draw?.();
@@ -364,8 +368,8 @@ export function historyView(ctx) {
 
   return {
     el: root,
-    setTab(t) {
-      tab = t === 'log' ? 'log' : 'weeks';
+    setTab(name) {
+      tab = name === 'log' ? 'log' : 'weeks';
       if (tab === 'weeks') store.loadHistory();
       else if (logLoaded) loadLog(true);
       draw();

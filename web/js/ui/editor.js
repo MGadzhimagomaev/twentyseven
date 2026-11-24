@@ -2,8 +2,9 @@
 // sessions, counted in sessions. Muscle groups follow the weekly goal unless locked
 // to their own target; trainings always have their own. Nothing is saved until
 // "Save", and Undo takes the whole save back.
-import { el, fill, ICON, clamp, plural } from '../util.js';
-import { BUNDLES, TRAININGS, TRAINING_TARGET, matchBundle, cleanName, NAME_MAX, GROUPS_MAX } from '../bundles.js';
+import { el, fill, ICON, clamp } from '../util.js';
+import { t } from '../i18n.js';
+import { BUNDLES, workoutPicks, TRAINING_TARGET, matchBundle, cleanName, NAME_MAX, GROUPS_MAX } from '../bundles.js';
 import { openSheet } from './dialog.js';
 
 export function openEditor({ store, toast, undo }) {
@@ -14,7 +15,7 @@ export function openEditor({ store, toast, undo }) {
   let focusAdd = '';
 
   const body = el('div', { class: 'editor' });
-  const sheet = openSheet(body, { label: 'Edit groups' });
+  const sheet = openSheet(body, { label: t('sets.edit_groups') });
 
   const muscles = () => draft.filter(d => d.kind !== 'sessions');
   const runs = () => draft.filter(d => d.kind === 'sessions');
@@ -44,8 +45,8 @@ export function openEditor({ store, toast, undo }) {
   function add(name, kind, id = null) {
     name = cleanName(name);
     if (!name) return false;
-    if (draft.length >= GROUPS_MAX) { error = `Up to ${GROUPS_MAX} groups and workouts in all.`; draw(); return false; }
-    if (draft.some(d => lower(d.name) === name.toLowerCase())) { error = `“${name}” is already in the list.`; draw(); return false; }
+    if (draft.length >= GROUPS_MAX) { error = t('editor.too_many', { max: GROUPS_MAX }); draw(); return false; }
+    if (draft.some(d => lower(d.name) === name.toLowerCase())) { error = t('editor.duplicate', { name }); draw(); return false; }
     const back = [...known.values()].find(g => g.archived_at && (g.kind || 'sets') === kind && g.name.toLowerCase() === name.toLowerCase() && !draft.some(d => d.id === g.id));
     const clash = id && known.get(id) && ((known.get(id).kind || 'sets') !== kind || !known.get(id).archived_at);
     const useId = back?.id ?? (clash ? null : id);
@@ -59,12 +60,12 @@ export function openEditor({ store, toast, undo }) {
   }
 
   function check() {
-    if (!draft.length) return 'Keep at least one group or workout.';
+    if (!draft.length) return t('editor.keep_one');
     const names = draft.map(d => cleanName(d.name));
-    if (names.some(n => !n)) return 'Every group and workout needs a name.';
+    if (names.some(n => !n)) return t('editor.needs_name');
     const seen = new Set();
     for (const n of names) {
-      if (seen.has(n.toLowerCase())) return `“${n}” is in the list twice.`;
+      if (seen.has(n.toLowerCase())) return t('editor.twice', { name: n });
       seen.add(n.toLowerCase());
     }
     return '';
@@ -73,30 +74,30 @@ export function openEditor({ store, toast, undo }) {
   function save() {
     error = check();
     if (error) { draw(); return; }
-    const changed = store.saveGroupList(draft.map(d => ({ ...d, name: cleanName(d.name) })), 'Group changes');
+    const changed = store.saveGroupList(draft.map(d => ({ ...d, name: cleanName(d.name) })), t('undo.groups'));
     sheet.close();
-    if (changed) toast('Groups saved', { action: 'Undo', onAction: undo });
+    if (changed) toast(t('editor.saved'), { action: t('common.undo'), onAction: undo });
   }
 
-  function stepper(d, label, min = 1) {
+  function stepper(d, min = 1) {
     const set = n => { d.own_target = clamp(n, min, 50); draw(); };
     return [
-      el('button', { type: 'button', class: 'mini', 'aria-label': `Lower ${label}`, html: ICON.minus, disabled: d.own_target <= min, onclick: () => set(d.own_target - 1) }),
+      el('button', { type: 'button', class: 'mini', 'aria-label': t('editor.lower_target', { name: d.name }), html: ICON.minus, disabled: d.own_target <= min, onclick: () => set(d.own_target - 1) }),
       el('output', { class: 'mini-value', text: d.own_target }),
-      el('button', { type: 'button', class: 'mini', 'aria-label': `Raise ${label}`, html: ICON.plus, disabled: d.own_target >= 50, onclick: () => set(d.own_target + 1) }),
+      el('button', { type: 'button', class: 'mini', 'aria-label': t('editor.raise_target', { name: d.name }), html: ICON.plus, disabled: d.own_target >= 50, onclick: () => set(d.own_target + 1) }),
     ];
   }
 
-  function nameField(d, i, what) {
+  function nameField(d, i, key) {
     return el('input', {
       class: 'field', type: 'text', value: d.name, maxlength: String(NAME_MAX), spellcheck: 'false',
-      'aria-label': `${what} ${i + 1} name`, oninput: e => { d.name = e.target.value; },
+      'aria-label': t(key, { i: i + 1 }), oninput: e => { d.name = e.target.value; },
     });
   }
   const moveButtons = (d, i, n, kind) => [
-    el('button', { type: 'button', class: 'ibtn', 'aria-label': `Move ${d.name} up`, html: ICON.up, disabled: i === 0, onclick: () => move(kind, i, -1) }),
-    el('button', { type: 'button', class: 'ibtn', 'aria-label': `Move ${d.name} down`, html: ICON.down, disabled: i === n - 1, onclick: () => move(kind, i, 1) }),
-    el('button', { type: 'button', class: 'ibtn', 'aria-label': `Remove ${d.name}`, html: ICON.remove, disabled: draft.length === 1, onclick: () => remove(d) }),
+    el('button', { type: 'button', class: 'ibtn', 'aria-label': t('editor.move_up', { name: d.name }), html: ICON.up, disabled: i === 0, onclick: () => move(kind, i, -1) }),
+    el('button', { type: 'button', class: 'ibtn', 'aria-label': t('editor.move_down', { name: d.name }), html: ICON.down, disabled: i === n - 1, onclick: () => move(kind, i, 1) }),
+    el('button', { type: 'button', class: 'ibtn', 'aria-label': t('editor.remove', { name: d.name }), html: ICON.remove, disabled: draft.length === 1, onclick: () => remove(d) }),
   ];
 
   function muscleRow(d, i, n) {
@@ -104,13 +105,13 @@ export function openEditor({ store, toast, undo }) {
     const old = d.id && known.get(d.id);
     return el('li', { class: 'erow' },
       el('div', { class: 'erow-main' },
-        nameField(d, i, 'Group'),
+        nameField(d, i, 'editor.group_name'),
         locked
-          ? el('div', { class: 'own-target' }, el('span', { class: 'erow-sub', text: 'Own target' }), ...stepper(d, `${d.name}'s target`))
-          : el('p', { class: 'erow-sub', text: old?.archived_at ? `Back, with its old sets · follows the goal (${goal})` : `Follows the goal (${goal})` })),
+          ? el('div', { class: 'own-target' }, el('span', { class: 'erow-sub', text: t('tile.own_target') }), ...stepper(d))
+          : el('p', { class: 'erow-sub', text: t(old?.archived_at ? 'editor.back_follows' : 'editor.follows', { goal }) })),
       el('button', {
         type: 'button', class: locked ? 'ibtn on' : 'ibtn', 'aria-pressed': String(locked), html: locked ? ICON.lock : ICON.unlock,
-        'aria-label': locked ? `${d.name || 'This group'} has its own target. Let it follow the goal` : `Give ${d.name || 'this group'} its own target`,
+        'aria-label': t(locked ? 'editor.locked' : 'editor.unlocked', { name: d.name || t('editor.this_group') }),
         onclick: () => { d.own_target = locked ? null : goal; draw(); },
       }),
       ...moveButtons(d, i, n, 'sets'));
@@ -119,64 +120,64 @@ export function openEditor({ store, toast, undo }) {
   function trainingRow(d, i, n) {
     return el('li', { class: 'erow runs' },
       el('div', { class: 'erow-main' },
-        nameField(d, i, 'Workout'),
-        el('div', { class: 'own-target' }, el('span', { class: 'erow-sub', text: 'Times a week' }), ...stepper(d, `${d.name}'s weekly target`))),
+        nameField(d, i, 'editor.workout_name'),
+        el('div', { class: 'own-target' }, el('span', { class: 'erow-sub', text: t('editor.times_a_week') }), ...stepper(d))),
       ...moveButtons(d, i, n, 'sessions'));
   }
 
   function addForm(kind, placeholder) {
-    const input = el('input', { class: 'field', type: 'text', maxlength: String(NAME_MAX), placeholder, 'aria-label': kind === 'sessions' ? 'New workout name' : 'New group name', spellcheck: 'false' });
+    const input = el('input', { class: 'field', type: 'text', maxlength: String(NAME_MAX), placeholder, 'aria-label': t(kind === 'sessions' ? 'editor.new_workout' : 'editor.new_group'), spellcheck: 'false' });
     if (focusAdd === kind) queueMicrotask(() => { input.focus(); focusAdd = ''; });
     return el('form', {
       class: 'ed-add', autocomplete: 'off',
       onsubmit: e => { e.preventDefault(); add(input.value, kind); },
-    }, input, el('button', { type: 'submit', class: 'add-btn', html: ICON.plus }, 'Add'));
+    }, input, el('button', { type: 'submit', class: 'add-btn', html: ICON.plus }, t('editor.add')));
   }
 
   function draw() {
     const m = muscles(), r = runs();
     const current = matchBundle(m.map(d => ({ id: d.id, name: cleanName(d.name) })));
     const anyLocked = m.some(d => d.own_target != null);
-    const picks = TRAININGS.filter(([id, name]) => !draft.some(d => d.id === id || lower(d.name) === name.toLowerCase()));
+    const picks = workoutPicks().filter(([id, name]) => !draft.some(d => d.id === id || lower(d.name) === name.toLowerCase()));
 
     fill(body,
       el('div', { class: 'ed-head' },
         el('div', { class: 'ed-head-row' },
-          el('h2', { class: 'sheet-title', text: 'Edit groups' }),
-          el('span', { class: 'ed-count', text: [m.length ? plural(m.length, 'group', 'groups') : '', r.length ? plural(r.length, 'workout', 'workouts') : ''].filter(Boolean).join(' · ') || 'Empty' })),
-        el('p', { class: 'ed-note', text: 'Rename, reorder, add or remove. Removed ones keep their history.' })),
+          el('h2', { class: 'sheet-title', text: t('sets.edit_groups') }),
+          el('span', { class: 'ed-count', text: [m.length ? t('settings.n_groups', { n: m.length }) : '', r.length ? t('settings.n_workouts', { n: r.length }) : ''].filter(Boolean).join(' · ') || t('editor.empty') })),
+        el('p', { class: 'ed-note', text: t('editor.note') })),
 
       el('section', { class: 'ed-section', 'aria-labelledby': 'ed-muscles' },
         el('div', { class: 'ed-section-head' },
-          el('h3', { class: 'ed-section-title', id: 'ed-muscles', text: 'Muscle groups' }),
-          el('p', { class: 'ed-note', text: 'Counted in sets. They follow the weekly goal, unless you tap the lock to give one its own target.' })),
-        el('div', { class: 'ed-presets', role: 'group', 'aria-label': 'Start from a bundle' },
-          el('span', { class: 'label', text: 'Start from' }),
+          el('h3', { class: 'ed-section-title', id: 'ed-muscles', text: t('editor.groups_title') }),
+          el('p', { class: 'ed-note', text: `${t('groups.what')} ${t('editor.groups_note')}` })),
+        el('div', { class: 'ed-presets', role: 'group', 'aria-label': t('editor.bundle_label') },
+          el('span', { class: 'label', text: t('editor.start_from') }),
           el('div', { class: 'chips' }, ...BUNDLES.map(b => el('button', {
             type: 'button', class: 'chip', 'aria-current': String(current === b.key), html: ICON.tick, onclick: () => pickBundle(b),
           }, b.name, el('span', { class: 'chip-n', text: b.groups.length }))))),
-        m.length ? el('ol', { class: 'ed-list' }, ...m.map((d, i) => muscleRow(d, i, m.length))) : el('p', { class: 'ed-empty', text: 'No muscle groups. Pick a bundle or add one.' }),
-        addForm('sets', 'Add a group, e.g. Forearms'),
+        m.length ? el('ol', { class: 'ed-list' }, ...m.map((d, i) => muscleRow(d, i, m.length))) : el('p', { class: 'ed-empty', text: t('editor.no_groups') }),
+        addForm('sets', t('editor.add_group_placeholder')),
         anyLocked ? el('div', { class: 'ed-unlock' },
-          el('button', { type: 'button', class: 'link-btn', text: 'Unlock all', onclick: () => { for (const d of m) d.own_target = null; draw(); } }),
-          el('span', { class: 'muted small', text: 'Every muscle group follows the weekly goal again.' })) : null),
+          el('button', { type: 'button', class: 'link-btn', text: t('editor.unlock_all'), onclick: () => { for (const d of m) d.own_target = null; draw(); } }),
+          el('span', { class: 'muted small', text: t('editor.unlock_all_note') })) : null),
 
       el('section', { class: 'ed-section', 'aria-labelledby': 'ed-trainings' },
         el('div', { class: 'ed-section-head' },
-          el('h3', { class: 'ed-section-title', id: 'ed-trainings', text: 'Workouts' }),
-          el('p', { class: 'ed-note', text: 'Runs, rides, gym sessions: anything you count per week. Each has its own weekly target and adds up apart from your sets.' })),
-        picks.length ? el('div', { class: 'ed-presets', role: 'group', 'aria-label': 'Quick picks' },
-          el('span', { class: 'label', text: 'Add' }),
+          el('h3', { class: 'ed-section-title', id: 'ed-trainings', text: t('editor.workouts_title') }),
+          el('p', { class: 'ed-note', text: `${t('workouts.what')} ${t('editor.workouts_note')}` })),
+        picks.length ? el('div', { class: 'ed-presets', role: 'group', 'aria-label': t('editor.quick_picks') },
+          el('span', { class: 'label', text: t('editor.add') }),
           el('div', { class: 'chips' }, ...picks.map(([id, name]) => el('button', {
             type: 'button', class: 'chip', html: ICON.plus, onclick: () => add(name, 'sessions', id),
           }, name)))) : null,
         r.length ? el('ol', { class: 'ed-list' }, ...r.map((d, i) => trainingRow(d, i, r.length))) : null,
-        addForm('sessions', 'Add a workout, e.g. Climbing')),
+        addForm('sessions', t('editor.add_workout_placeholder'))),
 
       error ? el('p', { class: 'ed-error', role: 'alert', text: error }) : null,
       el('div', { class: 'tray' },
-        el('button', { type: 'button', class: 'tray-btn', text: 'Cancel', onclick: () => sheet.close() }),
-        el('button', { type: 'button', class: 'tray-btn primary', text: 'Save groups', onclick: save })));
+        el('button', { type: 'button', class: 'tray-btn', text: t('common.cancel'), onclick: () => sheet.close() }),
+        el('button', { type: 'button', class: 'tray-btn primary', text: t('editor.save'), onclick: save })));
   }
 
   draw();

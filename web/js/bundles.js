@@ -1,48 +1,40 @@
 // Starting sets of muscle groups, coarse to fine. Ids are shared where groups
 // match (Shoulders in Classic is `delts` in Extended), so switching keeps sets.
+// Names come in the current language when a bundle is picked; after that they
+// are the person's own and stay as saved.
+import { t } from './i18n.js';
+
+const bundle = (key, groups) => ({
+  key,
+  get name() { return t(`bundle.${key}`); },
+  get groups() { return groups.map(([id, name]) => [id, t(`group.${name}`)]); },
+});
+
 export const BUNDLES = [
-  {
-    key: 'ppl',
-    name: 'Push / Pull / Legs',
-    note: 'For a push, pull, legs split',
-    groups: [['push', 'Push'], ['pull', 'Pull'], ['legs', 'Legs']],
-  },
-  {
-    key: 'classic',
-    name: 'Classic',
-    note: 'The major muscle groups',
-    groups: [['chest', 'Chest'], ['back', 'Back'], ['delts', 'Shoulders'], ['arms', 'Arms'], ['legs', 'Legs'], ['core', 'Core']],
-  },
-  {
-    key: 'extended',
-    name: 'Extended',
-    note: 'Classic with arms split in two',
-    groups: [['legs', 'Legs'], ['back', 'Back'], ['chest', 'Chest'], ['core', 'Core'], ['biceps', 'Biceps'], ['triceps', 'Triceps'], ['delts', 'Delts']],
-  },
-  {
-    key: 'detailed',
-    name: 'Detailed',
-    note: 'Delts and legs split into parts',
-    groups: [
-      ['chest', 'Chest'], ['back', 'Back'], ['front-delts', 'Front delts'], ['side-delts', 'Side delts'],
-      ['rear-delts', 'Rear delts'], ['traps', 'Traps'], ['biceps', 'Biceps'], ['triceps', 'Triceps'],
-      ['forearms', 'Forearms'], ['abs', 'Abs'], ['quads', 'Quads'], ['hamstrings', 'Hamstrings'],
-      ['glutes', 'Glutes'], ['calves', 'Calves'],
-    ],
-  },
+  bundle('ppl', [['push', 'push'], ['pull', 'pull'], ['legs', 'legs']]),
+  bundle('classic', [['chest', 'chest'], ['back', 'back'], ['delts', 'shoulders'], ['arms', 'arms'], ['legs', 'legs'], ['core', 'core']]),
+  bundle('extended', [['legs', 'legs'], ['back', 'back'], ['chest', 'chest'], ['core', 'core'], ['biceps', 'biceps'], ['triceps', 'triceps'], ['delts', 'delts']]),
+  bundle('detailed', [
+    ['chest', 'chest'], ['back', 'back'], ['front-delts', 'front_delts'], ['side-delts', 'side_delts'],
+    ['rear-delts', 'rear_delts'], ['traps', 'traps'], ['biceps', 'biceps'], ['triceps', 'triceps'],
+    ['forearms', 'forearms'], ['abs', 'abs'], ['quads', 'quads'], ['hamstrings', 'hamstrings'],
+    ['glutes', 'glutes'], ['calves', 'calves'],
+  ]),
 ];
 
 export const bundleByKey = key => BUNDLES.find(b => b.key === key);
 
-// Trainings are counted in sessions, each toward its own weekly target.
-export const TRAININGS = [['running', 'Running'], ['cycling', 'Cycling'], ['swimming', 'Swimming'], ['gym', 'Gym'], ['yoga', 'Yoga']];
+// Workouts are counted in sessions, each toward its own weekly target.
+const WORKOUT_IDS = ['running', 'cycling', 'swimming', 'gym', 'yoga'];
+export const workoutPicks = () => WORKOUT_IDS.map(id => [id, t(`workout.${id}`)]);
 export const TRAINING_TARGET = 3;
 export const isTraining = g => g?.kind === 'sessions';
 
-// Which bundle a list of groups matches exactly, or 'custom'.
+// Which bundle a list of groups matches, or 'custom'.
 export function matchBundle(groups) {
   for (const b of BUNDLES) {
-    if (b.groups.length === groups.length && b.groups.every(([id, name], i) => groups[i].id === id && groups[i].name === name)) {
+    // Same groups in the same order; names may be in another language or renamed.
+    if (b.groups.length === groups.length && b.groups.every(([id], i) => groups[i].id === id)) {
       return b.key;
     }
   }

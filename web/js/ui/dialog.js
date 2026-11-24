@@ -1,6 +1,7 @@
 // Modal sheets on the native <dialog> element: Escape and the backdrop close them,
 // and focus returns to where it was.
 import { el } from '../util.js';
+import { t } from '../i18n.js';
 
 export function openSheet(content, { label, onClose, wide = false } = {}) {
   const back = document.activeElement;
@@ -25,7 +26,7 @@ export function openSheet(content, { label, onClose, wide = false } = {}) {
 export const isSheetOpen = () => !!document.querySelector('dialog.sheet[open]');
 
 // Asks a yes/no question. Resolves true only when the confirm button is pressed.
-export function confirmSheet({ title, text, confirm, cancel = 'Cancel', danger = false }) {
+export function confirmSheet({ title, text, confirm, cancel = t('common.cancel'), danger = false }) {
   return new Promise(resolve => {
     let answer = false;
     const ok = el('button', { type: 'button', class: danger ? 'btn danger' : 'btn primary', text: confirm, onclick: () => { answer = true; sheet.close(); } });

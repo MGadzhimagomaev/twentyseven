@@ -1,6 +1,7 @@
 // Weeks that start on Monday or Sunday, in the device's time zone.
 // Mirrors public.week_start_of() in the database.
 import { isoDate, parseDate, addDays, range } from './util.js';
+import { t } from './i18n.js';
 
 const DAY = 864e5;
 
@@ -52,13 +53,11 @@ export function shiftWeek(week, n) {
 
 // Header words: Monday weeks show their ISO number, Sunday weeks their dates.
 export function weekTitle(week) {
-  return week.weekStart === 'sunday' ? range(week.start, week.end) : `Week ${week.number}`;
+  return week.weekStart === 'sunday' ? range(week.start, week.end) : t('week.title', { n: week.number });
 }
 
 export function weekSubtitle(week, isCurrent) {
-  const left = week.daysLeft === 1 ? 'resets tonight' : `${week.daysLeft} days left`;
-  if (week.weekStart === 'sunday') return isCurrent ? left : 'Past week';
-  return isCurrent ? `${range(week.start, week.end)} · ${left}` : `${range(week.start, week.end)} · past week`;
+  const left = week.daysLeft === 1 ? t('week.resets_tonight') : t('week.days_left', { n: week.daysLeft });
+  if (week.weekStart === 'sunday') return isCurrent ? left : t('week.past');
+  return `${range(week.start, week.end)} · ${isCurrent ? left : t('week.past')}`;
 }
-
-export const resetDayName = weekStart => (weekStart === 'sunday' ? 'Sunday' : 'Monday');

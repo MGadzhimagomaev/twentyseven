@@ -2,6 +2,7 @@
 // the steps, since Safari has no install button; browsers that can install apps
 // get a button. Hidden once installed, or once closed.
 import { el, ICON } from '../util.js';
+import { t, tParts } from '../i18n.js';
 
 const KEY = 'twentyseven.installHint';
 let deferred = null;                       // the browser's install prompt, when it offers one
@@ -20,20 +21,19 @@ export const onInstallChange = fn => { listeners.add(fn); return () => listeners
 
 export function installCard(redraw) {
   if (installed() || closed()) return null;
-  const close = el('button', { type: 'button', class: 'ibtn', 'aria-label': 'Close', html: ICON.close, onclick: () => { remember(); redraw(); } });
+  const close = el('button', { type: 'button', class: 'ibtn', 'aria-label': t('common.close'), html: ICON.close, onclick: () => { remember(); redraw(); } });
   if (isApple()) {
-    return el('section', { class: 'install', 'aria-label': 'Add to Home Screen' },
+    return el('section', { class: 'install', 'aria-label': t('install.add_to_home') },
       el('div', { class: 'install-body' },
-        el('p', { class: 'label', text: 'Use it like an app' }),
-        el('p', { class: 'install-line' },
-          'Tap ', el('span', { class: 'inline-icon', html: ICON.share }), ' Share (in Safari it may be under ···), then “Add to Home Screen”.')),
+        el('p', { class: 'label', text: t('install.title') }),
+        el('p', { class: 'install-line' }, tParts('install.ios', { share: el('span', { class: 'inline-icon', html: ICON.share }) }))),
       close);
   }
   if (deferred) {
-    return el('section', { class: 'install', 'aria-label': 'Install 20/7' },
+    return el('section', { class: 'install', 'aria-label': t('install.install_app') },
       el('div', { class: 'install-body' },
-        el('p', { class: 'label', text: 'Use it like an app' }),
-        el('p', { class: 'install-line', text: 'Install 20/7 to open it from your home screen or dock, like any other app.' }),
+        el('p', { class: 'label', text: t('install.title') }),
+        el('p', { class: 'install-line', text: t('install.line') }),
         el('button', {
           type: 'button', class: 'btn primary', html: ICON.install,
           onclick: async () => {
@@ -44,7 +44,7 @@ export function installCard(redraw) {
             if (outcome === 'accepted') remember();
             redraw();
           },
-        }, 'Install')),
+        }, t('install.button'))),
       close);
   }
   return null;

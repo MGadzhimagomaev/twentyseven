@@ -2,6 +2,7 @@
 // it does. Everything else is shut off while it runs. Only the steps that ask for
 // it (logging the first set for real, −, Undo) let the lit control be used.
 import { el, fill } from '../util.js';
+import { t } from '../i18n.js';
 
 // steps: [{ id, target: () => Element | null, title, text: string or [strings and nodes] }]
 export function createTour(steps, { onEnd, interactive = ['log', 'minus', 'undo'] } = {}) {
@@ -39,14 +40,14 @@ export function createTour(steps, { onEnd, interactive = ['log', 'minus', 'undo'
     const step = steps[i];
     const last = i === steps.length - 1;
     fill(card,
-      el('p', { class: 'tour-count', text: `${i + 1} of ${steps.length}` }),
+      el('p', { class: 'tour-count', text: t('tour.count', { i: i + 1, n: steps.length }) }),
       el('h2', { class: 'tour-title', id: 'tour-title', text: step.title }),
       el('p', { class: 'tour-text' }, step.text),
       el('div', { class: 'tour-actions' },
-        last ? el('span') : el('button', { type: 'button', class: 'link-btn', text: 'Skip tour', onclick: end }),
+        last ? el('span') : el('button', { type: 'button', class: 'link-btn', text: t('tour.skip'), onclick: end }),
         el('div', { class: 'tour-nav' },
-          i > 0 ? el('button', { type: 'button', class: 'btn', text: 'Back', onclick: () => go(i - 1) }) : null,
-          el('button', { type: 'button', class: 'btn primary tour-next', text: last ? 'Done' : 'Next', onclick: () => go(i + 1) }))));
+          i > 0 ? el('button', { type: 'button', class: 'btn', text: t('tour.back'), onclick: () => go(i - 1) }) : null,
+          el('button', { type: 'button', class: 'btn primary tour-next', text: last ? t('tour.done') : t('tour.next'), onclick: () => go(i + 1) }))));
     place(true);
     card.querySelector('.tour-next')?.focus({ preventScroll: true });
   }

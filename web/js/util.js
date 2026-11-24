@@ -1,6 +1,5 @@
 // Small helpers shared by every screen.
-
-export const LOCALE = 'en-GB';
+import { locale, language } from './i18n.js';
 
 export function uuid() {
   if (crypto.randomUUID) return crypto.randomUUID();
@@ -33,35 +32,39 @@ export function timeZone() {
   try { return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'; } catch { return 'UTC'; }
 }
 
-const fmtDay = new Intl.DateTimeFormat(LOCALE, { day: 'numeric' });
-const fmtMonth = new Intl.DateTimeFormat(LOCALE, { month: 'short' });
-const fmtWeekday = new Intl.DateTimeFormat(LOCALE, { weekday: 'short' });
-const fmtTime = new Intl.DateTimeFormat(LOCALE, { hour: '2-digit', minute: '2-digit' });
-const fmtNumber = new Intl.NumberFormat(LOCALE);
+// Dates and numbers in the current language, e.g. "16 Nov", "16. Nov.", "11月16日".
+const formats = new Map();
+function format(kind, make) {
+  const key = `${locale()}|${kind}`;
+  let f = formats.get(key);
+  if (!f) formats.set(key, (f = make(locale())));
+  return f;
+}
+const dateFormat = (kind, options) => format(kind, loc => new Intl.DateTimeFormat(loc, options));
 
-export const day = s => fmtDay.format(parseDate(s));
-export const month = s => fmtMonth.format(parseDate(s));
-export const weekday = s => fmtWeekday.format(parseDate(s));
-export const time = iso => fmtTime.format(new Date(iso));
-export const number = n => fmtNumber.format(n);
+export const weekday = s => dateFormat('wd', { weekday: 'short' }).format(parseDate(s));
+export const dayMonth = s => dateFormat('dm', { day: 'numeric', month: 'short' }).format(parseDate(s));
+export const weekdayDayMonth = s => dateFormat('wdm', { weekday: 'short', day: 'numeric', month: 'short' }).format(parseDate(s));
+// Labels under charts must stay short: "23 Nov" where the language writes it
+// that way, numbers otherwise ("23/11", "11/23").
+const NAMED_AXIS = new Set(['en', 'de', 'es', 'fr', 'it', 'ru']);
+export const axisDate = s => (NAMED_AXIS.has(language()) ? dayMonth(s)
+  : dateFormat('dmn', { day: 'numeric', month: 'numeric' }).format(parseDate(s)));
+export const time = iso => dateFormat('t', { hour: '2-digit', minute: '2-digit' }).format(new Date(iso));
+export const number = n => format('n', loc => new Intl.NumberFormat(loc)).format(n);
 
-// "16 Nov"
-export const dayMonth = s => `${day(s)} ${month(s)}`;
-
-// "23–29 Nov" or "30 Nov – 6 Dec"
+// "23–29 Nov", "30 Nov – 6 Dec", "11月23日至29日": each language's own way.
 export function range(start, end) {
-  return month(start) === month(end)
-    ? `${day(start)}–${day(end)} ${month(end)}`
-    : `${dayMonth(start)} – ${dayMonth(end)}`;
+  const f = dateFormat('dm', { day: 'numeric', month: 'short' });
+  try { return f.formatRange(parseDate(start), parseDate(end)); } catch { return `${f.format(parseDate(start))} – ${f.format(parseDate(end))}`; }
 }
 
-// 8432 -> "8.4K", 10500 -> "10.5K", 12000 -> "12K", 950 -> "950"
-export function compact(n) {
-  if (n < 1000) return String(Math.round(n));
-  const k = n / 1000;
-  const s = k >= 100 ? k.toFixed(0) : k.toFixed(1);
-  return (s.endsWith('.0') ? s.slice(0, -2) : s) + 'K';
-}
+// 8432 -> "8.4K" in English, "8,4 Tsd." in German, "8443" where shorter forms
+// only start at ten thousand.
+export const compact = n => format('c', loc => new Intl.NumberFormat(loc, { notation: 'compact', maximumFractionDigits: 1 })).format(n);
+
+// A <select> with the app's own arrow.
+export const selectBox = select => el('span', { class: 'select-wrap' }, select, el('span', { class: 'select-chev', html: ICON.chevron }));
 
 // Builds DOM without HTML strings, so names people type never become markup.
 export function el(tag, attrs = {}, ...children) {
@@ -109,7 +112,8 @@ export const ICON = {
   share: '<svg class="icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M10 12.5V3M6.8 6.2L10 3l3.2 3.2M7 9H5v8h10V9h-2"/></svg>',
   install: '<svg class="icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M10 3v9.5M6.5 9L10 12.5 13.5 9M4.5 16.5h11"/></svg>',
   message: '<svg class="icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M3.5 5h13v8.5H9l-3.5 3v-3h-2z"/></svg>',
+  globe: '<svg class="icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M10 3.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 1 0 0-13zM3.5 10h13M10 3.5c-1.8 1.9-2.7 4-2.7 6.5s.9 4.6 2.7 6.5M10 3.5c1.8 1.9 2.7 4 2.7 6.5s-.9 4.6-2.7 6.5"/></svg>',
+  chevron: '<svg class="icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M6 8l4 4 4-4"/></svg>',
 };
 
 export const clamp = (n, lo, hi) => Math.min(hi, Math.max(lo, n));
-export const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;

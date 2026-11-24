@@ -6,6 +6,7 @@ import { weekOf } from './week.js';
 import { bundleByKey, matchBundle, idFor, cleanName, isTraining, TRAINING_TARGET } from './bundles.js';
 import { classify } from './api.js';
 import { APP_VERSION } from './config.js';
+import { t } from './i18n.js';
 
 const CACHE = 'twentyseven.v2.';
 export const WEEKS_KEPT = 12;            // weeks of sets kept on the device; Sets can step back through them
@@ -278,7 +279,7 @@ export function createStore(api) {
           // Something the database keeps refusing: drop it so the rest can go through.
           s.pending.shift();
           persist();
-          notice('A change couldn’t be saved, so it was left out.');
+          notice(t('notice.save_failed'));
           refresh();
         }
         setSync('error');
@@ -462,7 +463,7 @@ export function createStore(api) {
     pushUndo({ type: 'settings', field, before, after: { [field]: value }, label, at: Date.now() });
     persist(); emit();
   }
-  const setGoal = n => setSetting('weekly_goal', clamp(n, 1, 50), `Goal ${clamp(n, 1, 50)}`);
+  const setGoal = n => setSetting('weekly_goal', clamp(n, 1, 50), t('undo.goal', { n: clamp(n, 1, 50) }));
 
   // Saves the edited list of groups. Each draft row is { id?, name, own_target }:
   // an id keeps a group (and its sets) or brings a removed one back; groups missing
@@ -492,7 +493,7 @@ export function createStore(api) {
     return rows.filter(r => !byId.has(r.id) || !sameRow(byId.get(r.id), r));
   }
 
-  function saveGroupList(draft, label = 'Group changes') {
+  function saveGroupList(draft, label = t('undo.groups')) {
     const now = new Date().toISOString();
     const byId = new Map(s.groups.map(g => [g.id, g]));
     const changed = groupRowsFor(draft);
@@ -532,7 +533,7 @@ export function createStore(api) {
     const row = { id: r.ref, group_id: r.group_id, delta, local_date: r.local_date, logged_at: r.happened_at, source: r.source || 'web' };
     dropEntry(row.id);
     stale();
-    pushUndo({ type: 'removed', row, label: `${group?.name ?? 'Set'} ${delta > 0 ? '+' : '−'}${Math.abs(delta)} removed`, at: Date.now() });
+    pushUndo({ type: 'removed', row, label: t('undo.removed', { what: `${group?.name ?? ''} ${delta > 0 ? '+' : '−'}${Math.abs(delta)}`.trim() }), at: Date.now() });
     persist(); scheduleFlush(); emit();
     return row;
   }

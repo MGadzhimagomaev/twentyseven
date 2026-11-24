@@ -12,6 +12,9 @@ import { serve } from './server.mjs';
 const require = createRequire(import.meta.url);
 const { chromium } = require('playwright');
 const fakeSrc = readFileSync(new URL('./fake-api.js', import.meta.url), 'utf8');
+// The browsers below say German, so the app would speak German; most checks read
+// the English words, so English is picked as if chosen in Settings.
+const english = () => { try { if (location.protocol.startsWith('http')) localStorage.setItem('twentyseven.lang', 'en'); } catch { /* about:blank */ } };
 const shots = process.argv[2];
 
 let checks = 0;
@@ -26,10 +29,37 @@ const files = walk(webDir).map(f => path.relative(webDir, f)).filter(f => !f.end
 for (const f of files) ok(listed.includes(f) || (f.endsWith('index.html') && listed.includes(path.dirname(f) + '/')), `sw.js caches ${f}`);
 for (const f of listed) ok(f === './' || f.endsWith('/') || files.includes(f), `sw.js lists a file that exists: ${f}`);
 
+// ---------- every language has every text ----------
+const localeDir = path.join(webDir, 'js', 'locales');
+const load = async code => (await import(new URL(`../../web/js/locales/${code}.js`, import.meta.url))).default;
+const enDict = await load('en');
+const varsOf = v => new Set((typeof v === 'object' ? Object.values(v) : [v]).flatMap(s => [...s.matchAll(/\{(\w+)\}/g)].map(m => m[1])));
+const mayDrop = { 'sets.goal_toast_own': ['ownText'] };    // some languages build that sentence without it
+const codes = readdirSync(localeDir).map(f => f.replace(/\.js$/, '')).filter(c => c !== 'en');
+eq(codes.sort().join(','), 'de,es,fr,it,ja,pt,ru,zh', 'eight languages besides English');
+for (const code of codes) {
+  const dict = await load(code);
+  const rules = new Intl.PluralRules({ zh: 'zh-CN', pt: 'pt-BR' }[code] || code);
+  const forms = new Set(Array.from({ length: 1001 }, (_, n) => rules.select(n)));
+  const problems = [];
+  for (const [key, text] of Object.entries(enDict)) {
+    const own = dict[key];
+    if (own == null) { problems.push(`${key} missing`); continue; }
+    if ((typeof own === 'object') !== (typeof text === 'object')) { problems.push(`${key} plural shape`); continue; }
+    if (typeof own === 'object') for (const f of [...forms, 'other']) if (!(f in own)) problems.push(`${key} lacks ${f}`);
+    const want = varsOf(text), got = varsOf(own);
+    for (const v of got) if (!want.has(v)) problems.push(`${key} has unknown {${v}}`);
+    for (const v of want) if (!got.has(v) && !(mayDrop[key] || []).includes(v)) problems.push(`${key} drops {${v}}`);
+  }
+  for (const key of Object.keys(dict)) if (!(key in enDict)) problems.push(`${key} is not in English`);
+  eq(problems.join('; '), '', `${code}: every English text is translated, with the same placeholders`);
+}
+
 const { server, url } = await serve();
 const browser = await chromium.launch();
 const context = await browser.newContext({ viewport: { width: 393, height: 852 }, locale: 'de-DE', timezoneId: 'Europe/Berlin', acceptDownloads: true });
 await context.addInitScript(fakeSrc);
+await context.addInitScript(english);
 const page = await context.newPage();
 const errors = [];
 page.on('pageerror', e => errors.push(e.message));
@@ -53,7 +83,7 @@ async function shot(name) {
 await page.goto(url);
 await page.waitForSelector('#auth-email');
 eq(await page.locator('h1').textContent(), '20/7', 'signed-out people see the welcome page');
-eq(await page.locator('.tagline').textContent(), '20 sets for each muscle group, every 7 days.', 'it says what 20/7 means');
+eq(await page.locator('.tagline').textContent(), 'One place for everything you train.', 'it says what 20/7 is for');
 await page.click('summary:has-text("Why 20/7?")');
 ok((await page.locator('.why').textContent()).includes('in my notes'), 'Why 20/7? tells the story');
 ok((await page.locator('.why').textContent()).includes('12–20 sets per muscle a week') && await page.locator('.why a').count() === 2, 'and the research, with sources');
@@ -88,8 +118,8 @@ eq(await page.locator('.choice[aria-checked="true"] .choice-name').textContent()
 eq(await page.locator('.seg-btn[aria-checked="true"]').textContent(), 'Monday', 'a German locale starts weeks on Monday');
 await shot('02-setup');
 await page.click('text=Extended · 7');
-await page.click('[aria-label="Lower the goal"]');
-await page.click('[aria-label="Lower the goal"]');
+await page.click('[aria-label="Lower the weekly goal"]');
+await page.click('[aria-label="Lower the weekly goal"]');
 await page.click('text=Start tracking');
 await page.waitForSelector('.grid');
 eq(await page.locator('.cell').count(), 7, 'Extended gives seven groups');
@@ -177,7 +207,7 @@ await page.waitForSelector('dialog.sheet[open] .editor');
 await shot('04-editor');
 const rowOf = name => page.locator('.erow', { has: page.locator(`input[value="${name}"]`) });
 await rowOf('Chest').locator('[aria-label^="Give Chest its own target"]').click();
-for (let i = 0; i < 6; i++) await page.click('[aria-label="Lower Chest\'s target"]');
+for (let i = 0; i < 6; i++) await page.click('[aria-label="Chest: lower the target"]');
 eq(await page.locator('.mini-value').textContent(), '12', 'own target set in the editor');
 await rowOf('Delts').locator('input').fill('Shoulders');
 await rowOf('Core').locator('[aria-label="Remove Core"]').click();
@@ -210,7 +240,7 @@ await page.waitForSelector('dialog.sheet[open] .editor');
 await page.click('.chip:has-text("Running")');
 const runRow = page.locator('.erow.runs', { has: page.locator('input[value="Running"]') });
 eq(await runRow.locator('.mini-value').textContent(), '3', 'a training starts at 3 a week');
-await runRow.locator('[aria-label="Lower Running\'s weekly target"]').click();
+await runRow.locator('[aria-label="Running: lower the target"]').click();
 await shot('04b-editor-trainings');
 await page.click('text=Save groups');
 await page.waitForSelector('dialog.sheet', { state: 'detached' });
@@ -399,18 +429,19 @@ ok(!page.url().includes('error'), 'and the address is tidied');
 {
   const c = await browser.newContext({ viewport: { width: 393, height: 852 }, locale: 'de-DE', timezoneId: 'Europe/Berlin' });
   await c.addInitScript(fakeSrc);
+  await c.addInitScript(english);
   const p = await c.newPage();
   p.on('pageerror', e => errors.push(e.message));
   await p.goto(url + '#settings');
   await p.evaluate(() => window.__fake.signIn('runner@example.com'));
   await p.waitForSelector('.setup');
-  await p.click('text=No muscle groups');
-  eq(await p.locator('#setup-goal').count(), 0, 'no weekly goal of sets without muscle groups');
+  await p.click('text=No groups');
+  eq(await p.locator('#setup-goal').count(), 0, 'no weekly goal of sets without groups');
   await p.click('text=Start tracking');
   ok((await p.locator('.form-msg').textContent()).includes('at least one workout'), 'setup needs something to count');
   await p.click('[role="checkbox"]:has-text("Running")');
   await p.click('[role="checkbox"]:has-text("Gym")');
-  await p.click('[aria-label="More gym a week"]');
+  await p.click('[aria-label="Gym: one more a week"]');
   if (shots) await p.screenshot({ path: `${shots}/11-setup-trainings.png`, fullPage: true });
   await p.click('text=Start tracking');
   await p.waitForSelector('.grid');
@@ -429,6 +460,7 @@ ok(!page.url().includes('error'), 'and the address is tidied');
 {
   const c = await browser.newContext({ ...require('playwright').devices['iPhone 13'], locale: 'de-DE', timezoneId: 'Europe/Berlin' });
   await c.addInitScript(fakeSrc);
+  await c.addInitScript(english);
   const p = await c.newPage();
   p.on('pageerror', e => errors.push(e.message));
   await p.goto(url);
@@ -446,6 +478,49 @@ ok(!page.url().includes('error'), 'and the address is tidied');
   await p.reload();
   await p.waitForSelector('.grid');
   eq(await p.locator('.install').count(), 0, 'and stays closed');
+  await c.close();
+}
+
+// ---------- languages ----------
+{
+  const c = await browser.newContext({ viewport: { width: 393, height: 852 }, locale: 'de-DE', timezoneId: 'Europe/Berlin' });
+  await c.addInitScript(fakeSrc);
+  const p = await c.newPage();
+  p.on('pageerror', e => errors.push(e.message));
+  const de = await load('de'), ru = await load('ru');
+  await p.goto(url);
+  await p.waitForSelector('#auth-email');
+  eq(await p.locator('.tagline').textContent(), de['auth.tagline'], 'a German browser gets German');
+  eq(await p.evaluate(() => document.documentElement.lang), 'de', 'and the page says so');
+  if (shots) await p.screenshot({ path: `${shots}/15-welcome-de.png`, fullPage: true });
+  await p.selectOption('#auth-lang', 'ru');
+  await p.waitForFunction(t => document.querySelector('.tagline')?.textContent === t, ru['auth.tagline']);
+  ok(true, 'the language can be picked before signing in');
+  await p.reload();
+  await p.waitForSelector('#auth-email');
+  eq(await p.locator('.tagline').textContent(), ru['auth.tagline'], 'and the pick is remembered');
+  await p.evaluate(() => window.__fake.signIn('ru@example.com'));
+  await p.waitForSelector('.setup');
+  ok((await p.locator('.choices').textContent()).includes('Грудь'), 'setup offers groups in Russian');
+  await p.click('.btn.primary.big');
+  await p.waitForSelector('.tour-card');
+  eq(await p.locator('.tour-title').textContent(), ru['tour.log.title_sets'], 'the tour speaks Russian');
+  await p.click('.tour-actions .link-btn');
+  eq(await p.locator('.cell-label').first().textContent(), 'Грудь', 'new groups get Russian names');
+  if (shots) await p.screenshot({ path: `${shots}/16-sets-ru.png`, fullPage: true });
+  await p.goto(url + '#settings');
+  await p.waitForSelector('.settings .select');
+  ok((await p.locator('.srow-note').nth(2).textContent()).includes('6 групп'), 'numbers take the right Russian form');
+  if (shots) await p.screenshot({ path: `${shots}/17-settings-ru.png`, fullPage: true });
+  const y = await p.evaluate(() => { document.querySelector('.settings .select').scrollIntoView(); return window.scrollY; });
+  await p.selectOption('.settings .select', 'en');
+  await p.waitForFunction(() => document.querySelector('h1')?.textContent === 'Settings');
+  eq(await p.locator('.tab').first().textContent(), 'Sets', 'switching in Settings changes every word');
+  ok(Math.abs(await p.evaluate(() => window.scrollY) - y) < 2, 'and keeps the place on the page');
+  eq(await p.locator('.cell-label').count(), 0, 'still on Settings');
+  await p.goto(url + '#sets');
+  await p.waitForSelector('.grid');
+  eq(await p.locator('.cell-label').first().textContent(), 'Грудь', 'names already saved stay as they are');
   await c.close();
 }
 
