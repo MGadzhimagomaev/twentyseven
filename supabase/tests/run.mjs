@@ -155,7 +155,9 @@ rows = await grid(A);
 ok(at(monday, 'delts').target === 22, 'unlocking delts makes it follow the goal again');
 
 // ---------- removing and restoring a group keeps its history ----------
-await as(A, `update public.muscle_groups set archived_at = now() where id = 'core'`);
+// Removed when this week began. (A group removed later in the week still shows
+// in that week, since it counted for part of it.)
+await as(A, `update public.muscle_groups set archived_at = ($1::date)::timestamp at time zone 'UTC' where id = 'core'`, [monday]);
 rows = await grid(A);
 ok(!at(monday, 'core') && at(w1, 'core'), 'removed group disappears from this week but keeps old weeks');
 await as(A, `update public.muscle_groups set archived_at = null where id = 'core'`);
@@ -188,6 +190,20 @@ for (const k of ['set', 'weekly_goal', 'group_target', 'group_added', 'group_rem
   ok(kinds.has(k), `activity log shows ${k}`);
 }
 ok(!log.some(r => r.kind === 'weekly_goal' && r.old_value === null && r.new_value === '20'), 'starting values are not listed');
+
+// ---------- where each change came from ----------
+const sources = (await as(A, `select kind, source from public.activity_log`)).rows;
+ok(sources.length > 0 && sources.every(r => r.source), 'every set and change in the log says where it came from');
+ok(sources.filter(r => r.kind !== 'set').every(r => r.source === 'web'), 'changes saved from the web app are marked web');
+await as(A, `update public.settings set weekly_goal = 19, source = 'ios' where user_id = $1`, [A]);
+await as(A, `update public.muscle_groups set name = 'Bis', source = 'ios' where id = 'biceps'`);
+let fromIos = (await as(A, `select kind from public.activity_log where source = 'ios' order by kind`)).rows.map(r => r.kind).join(',');
+ok(fromIos === 'group_renamed,weekly_goal', 'changes saved from the iPhone app are marked ios');
+await as(A, `update public.settings set weekly_goal = 20, source = 'web' where user_id = $1`, [A]);
+await as(A, `update public.muscle_groups set name = 'Biceps', source = 'web' where id = 'biceps'`);
+fromIos = (await as(A, `select count(*)::int as n from public.changes where source = 'ios'`)).rows[0].n;
+ok(fromIos === 2, 'a later save from the web is marked web again');
+await asFails(A, `update public.settings set source = 'fax' where user_id = $1`, [A], /check constraint/);
 
 // ---------- privacy between people ----------
 await as(B, `update public.settings set onboarded_at = now() where user_id = $1`, [B]);
